@@ -38,6 +38,14 @@
                    ::global-fields
                    ::response-observer
                    ::sample-rate]))
+(s/def ::send-options
+  (s/keys :opt-un [::api-host
+                   ::data-set
+                   ::metadata
+                   ::pre-sampled
+                   ::sample-rate
+                   ::timestamp
+                   ::write-key]))
 
 (s/fdef client-options
   :args (s/cat :options ::client-options)
@@ -142,34 +150,32 @@
     write-key (.setWriteKey write-key)))
 
 (s/fdef send
-  :args (s/alt :one (s/cat :event-data map?)
-               :two (s/cat :honeycomb-client (partial instance? HoneyClient)
-                           :event-data map?)
-               :three (s/cat :honeycomb-client (partial instance? HoneyClient)
-                             :event-data map?
-                             :options (s/keys :opt-un [::api-host
-                                                       ::data-set
-                                                       ::metadata
-                                                       ::pre-sampled
-                                                       ::sample-rate
-                                                       ::timestamp
-                                                       ::write-key]))))
+  :args (s/alt :implicit-no-options (s/cat :event-data map?)
+               :implicit-with-options (s/cat :event-data map?
+                                             :options ::send-options)
+               :explicit-no-options (s/cat :honeycomb-client (partial instance? HoneyClient)
+                                           :event-data map?)
+               :explicit-with-options (s/cat :honeycomb-client (partial instance? HoneyClient)
+                                             :event-data map?
+                                             :options ::send-options)))
 
-(defn send
-  "Send an event to Honeycomb.io."
-  ([event-data]
-   (if (some? *client*)
-     (send *client* event-data)
-     (throw
-      (IllegalStateException.
-       "Can't use implicit client without calling init first."))))
-  ([honeycomb-client event-data]
-   (send honeycomb-client event-data {}))
-  ([honeycomb-client event-data {:keys [pre-sampled] :as options}]
-   (let [event (create-event honeycomb-client event-data options)]
-     (if pre-sampled
-       (.sendPresampled event)
-       (.send event)))))
+(defn ^{:arglists '([event-data]
+                    [event-data options]
+                    [honeycomb-client event-data]
+                    [honeycomb-client event-data options])}
+  send
+  "Send an event to Honeycomb.io"
+  [& args]
+  (let [[honeycomb-client event-data {:keys [pre-sampled] :as options}]
+        (if (instance? HoneyClient (first args))
+          args
+          (concat [*client*] args))]
+    (when (nil? honeycomb-client)
+      (throw (IllegalStateException. "Either call init or pass a valid HoneyClient as the first argument.")))
+    (let [event (create-event honeycomb-client event-data (or options {}))]
+      (if pre-sampled
+        (.sendPresampled event)
+        (.send event)))))
 
 (def ^:dynamic *event-data* (atom {}))
 
