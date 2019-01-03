@@ -3,6 +3,9 @@
 A library for sending events to [Honeycomb.io](https://www.honeycomb.io/),
 wrapping [libhoney-java 1.0.2](https://github.com/honeycombio/libhoney-java).
 
+[![CircleCI](https://circleci.com/gh/conormcd/clj-honeycomb.svg?style=svg)](https://circleci.com/gh/conormcd/clj-honeycomb)
+[![codecov](https://codecov.io/gh/conormcd/clj-honeycomb/branch/master/graph/badge.svg)](https://codecov.io/gh/conormcd/clj-honeycomb)
+
 ## Usage
 
 Include the following in your `project.clj`:
