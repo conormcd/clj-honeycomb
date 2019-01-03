@@ -5,7 +5,7 @@
                                             "-dev"))
   :description "A Clojure interface to Honeycomb.io, built on libhoney-java."
   :url "http://github.com/conormcd/clj-honeycomb"
-  :license {:name "BSD 2-Clause Simplified License"
+  :license {:name "Apache License, Version 2.0"
             :url "https://github.com/conormcd/clj-honeycomb/blob/master/LICENSE"}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [clojure-future-spec "1.9.0"]
