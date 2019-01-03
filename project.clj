@@ -7,6 +7,14 @@
   :url "http://github.com/conormcd/clj-honeycomb"
   :license {:name "Apache License, Version 2.0"
             :url "https://github.com/conormcd/clj-honeycomb/blob/master/LICENSE"}
+  :repositories [["releases" {:url "https://clojars.org/repo"
+                              :username :env/clojars_username
+                              :password :env/clojars_password
+                              :sign-releases false}]
+                 ["snapshots" {:url "https://clojars.org/repo"
+                               :username :env/clojars_username
+                               :password :env/clojars_password
+                               :sign-releases false}]]
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [clojure-future-spec "1.9.0"]
                  [io.honeycomb.libhoney/libhoney-java ~libhoney-version]]

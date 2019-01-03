@@ -11,6 +11,14 @@ workflows:
       - test:
           requires:
             - cache-deps
+      - release:
+          context: clj-honeycomb-release
+          requires:
+            - lint
+            - test
+          filters:
+            branches:
+              only: master
 
 jobs:
   cache-deps:
@@ -48,3 +56,12 @@ jobs:
           name: Upload code coverage
           command: |
             bash <(curl -s https://codecov.io/bash)
+  release:
+    docker:
+      - image: circleci/clojure
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-m2-{{ checksum "project.clj" }}
+      - run: lein deploy
