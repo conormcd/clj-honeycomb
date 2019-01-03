@@ -144,17 +144,21 @@
                                           :write-key "write-key"})]
       (is (instance? HoneyClient client)))))
 
-(deftest init-works
+(deftest init-and-initialized?-works
   (is (nil? @#'honeycomb/*client*))
+  (is (not (honeycomb/initialized?)))
   (when (nil? @#'honeycomb/*client*)
     (try
       (let [options {:data-set "data-set"
                      :write-key "write-key"}]
         (with-open [client (honeycomb/client options)]
+          (is (not (honeycomb/initialized?)))
           (is (= (bean client) (bean (honeycomb/init options))))
-          (is (= (bean client) (bean @#'honeycomb/*client*)))))
+          (is (= (bean client) (bean @#'honeycomb/*client*)))
+          (is (honeycomb/initialized?))))
       (finally
         (alter-var-root #'honeycomb/*client* (constantly nil)))))
+  (is (not (honeycomb/initialized?)))
   (is (nil? @#'honeycomb/*client*)))
 
 (deftest create-event-works

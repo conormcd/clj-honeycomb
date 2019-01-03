@@ -122,6 +122,15 @@
     (alter-var-root #'*client* (constantly c))
     c))
 
+(s/fdef initialized?
+  :args (s/cat)
+  :ret boolean?)
+
+(defn initialized?
+  "Report whether or not init has set up a client yet."
+  []
+  (some? *client*))
+
 (s/fdef create-event
   :args (s/cat :honeycomb-client (partial instance? HoneyClient)
                :event-data map?
