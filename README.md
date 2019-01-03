@@ -3,6 +3,7 @@
 A library for sending events to [Honeycomb.io](https://www.honeycomb.io/),
 wrapping [libhoney-java 1.0.2](https://github.com/honeycombio/libhoney-java).
 
+[![Clojars Project](https://img.shields.io/clojars/v/conormcd/clj-honeycomb.svg)](https://clojars.org/conormcd/clj-honeycomb)
 [![CircleCI](https://circleci.com/gh/conormcd/clj-honeycomb.svg?style=svg)](https://circleci.com/gh/conormcd/clj-honeycomb)
 [![codecov](https://codecov.io/gh/conormcd/clj-honeycomb/branch/master/graph/badge.svg)](https://codecov.io/gh/conormcd/clj-honeycomb)
 
@@ -12,7 +13,7 @@ Include the following in your `project.clj`:
 
 ```clojure
 ; This is libhoney-java 1.0.2 build number 1 on CircleCI
-; See https://circleci.com/gh/conormcd/clj-honeycomb for the latest build
+; The most recent version can be found via the Clojars badge above
 [conormcd/clj-honeycomb "1.0.2.1"]
 ```
 
