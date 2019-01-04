@@ -1,8 +1,10 @@
 (ns clj-honeycomb.fields
-  "Fields are the data that are sent as part of an event. Events are just maps,
-   where the keys are either keywords or strings and the values may be anything.
-   Since clj-honeycomb wraps the Java Honeycomb SDK, we must transform some of
-   the values from Clojure types into more Java-friendly types where possible.
+  "Fields are the data that are sent as part of an event.
+
+   Events are just maps, where the keys are either keywords or strings and the
+   values may be anything. Since clj-honeycomb wraps the Java Honeycomb SDK, we
+   must transform some of the values from Clojure types into more Java-friendly
+   types where possible.
 
    Only the ->ValueSupplier function in this namespace should be considered part
    of the public API for clj-honeycomb."
@@ -89,7 +91,7 @@
     (->ValueSupplier realize-value x)
     x))
 
-(defn separate
+(defn ^:no-doc separate
   "Given a map, stringify the keys and convert any values that should be
    ValueSuppliers into them. Then return a tuple where the first item is the
    submap of the input where no values are ValueSuppliers and the second item is
@@ -103,7 +105,7 @@
     [(->> m (remove (comp (partial instance? ValueSupplier) val)) (into {}))
      (->> m (filter (comp (partial instance? ValueSupplier) val)) (into {}))]))
 
-(defn realize
+(defn ^:no-doc realize
   "Given a map, stringify the keys and realize all the values. This must be done
    at the last minute before sending an event so that any dynamic/delayed fields
    are computed as late as possible."

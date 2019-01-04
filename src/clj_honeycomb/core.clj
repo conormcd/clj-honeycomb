@@ -1,5 +1,17 @@
 (ns clj-honeycomb.core
-  "A thin wrapper over libhoney-java."
+  "A thin wrapper over libhoney-java. Use this to send events to Honeycomb.
+
+   Require this namespace as honeycomb and then use it like this:
+
+   ; Initialise this library
+   (honeycomb/init {:data-set \"Your Honeycomb dataset\"
+                    :write-key \"Your Honeycomb API key\"})
+
+   ; Send an event
+   (honeycomb/with-event {:initial :data} {}
+     ... do your stuff ...
+     (honeycomb/add-to-event :more \"event data\")
+     ... do more of your stuff ...)"
   (:refer-clojure :exclude [send])
   (:use clojure.future)
   (:require [clojure.spec.alpha :as s]
@@ -100,7 +112,45 @@
   :ret (partial instance? HoneyClient))
 
 (defn client
-  "Construct a HoneyClient from a map of options."
+  "Construct a HoneyClient from a map of options. It is your responsibility to
+   call .close on this object when you're finished with it. Failure to do so may
+   result in a loss of events. It is recommended that you create this client
+   using with-open or with a state management system like component or mount.
+
+   Valid options are:
+
+   :api-host             The base of the URL for all API calls to Honeycomb.
+                         (String. Optional. Default: \"https://api.honeycomb.io/\")
+   :data-set             The name of your Honeycomb dataset. (String. Required.)
+   :event-post-processor An instance of the libhoney-java class
+                         io.honeycomb.libhoney.EventPostProcessor which can be
+                         used to post-process event data after sampling but before
+                         sending the event to Honeycomb. (EventPostProcessor.
+                         Optional.)
+   :global-fields        A map of fields to include in every event. These fields
+                         can have dynamic values either by using an
+                         atom/delay/promise as its value or by supplying a
+                         ValueSupplier object as the value. Fields added to a
+                         given event will override these fields. (Map. Optional.)
+   :response-observer    A map of functions which will be called during the
+                         lifecycle of sending each event. (Map. Optional.)
+
+                         Keys in this map are:
+
+                         :on-client-rejected Called when the libhoney-java code
+                                             fails to send an event to
+                                             Honeycomb.
+                         :on-server-accepted Called when the Honeycomb server
+                                             has accepted the event. Be very
+                                             wary of supplying a function for
+                                             this, since it can be called a lot.
+                         :on-server-rejected Called when the Honeycomb server
+                                             rejects an event.
+                         :on-unknown         Called for all other errors in the
+                                             lifecycle of sending an event.
+   :sample-rate          The global sample rate. This can be overridden on a
+                         per-event basis. (Integer. Optional. Default: 1)
+   :write-key            Your Honeycomb API key. (String. Required.)"
   [options]
   (let [client (LibHoney/create (client-options options))]
     (when-let [ro (:response-observer options)]
@@ -114,8 +164,43 @@
   :ret (partial instance? HoneyClient))
 
 (defn init
-  "Initialise this library by creating a client with the supplied set of
-   options."
+  "Initialize this library by creating an internal, implicit client with the
+   supplied set of options.
+
+   Valid options are:
+
+   :api-host             The base of the URL for all API calls to Honeycomb.
+                         (String. Optional. Default: \"https://api.honeycomb.io/\")
+   :data-set             The name of your Honeycomb dataset. (String. Required.)
+   :event-post-processor An instance of the libhoney-java class
+                         io.honeycomb.libhoney.EventPostProcessor which can be
+                         used to post-process event data after sampling but before
+                         sending the event to Honeycomb. (EventPostProcessor.
+                         Optional.)
+   :global-fields        A map of fields to include in every event. These fields
+                         can have dynamic values either by using an
+                         atom/delay/promise as its value or by supplying a
+                         ValueSupplier object as the value. Fields added to a
+                         given event will override these fields. (Map. Optional.)
+   :response-observer    A map of functions which will be called during the
+                         lifecycle of sending each event. (Map. Optional.)
+
+                         Keys in this map are:
+
+                         :on-client-rejected Called when the libhoney-java code
+                                             fails to send an event to
+                                             Honeycomb.
+                         :on-server-accepted Called when the Honeycomb server
+                                             has accepted the event. Be very
+                                             wary of supplying a function for
+                                             this, since it can be called a lot.
+                         :on-server-rejected Called when the Honeycomb server
+                                             rejects an event.
+                         :on-unknown         Called for all other errors in the
+                                             lifecycle of sending an event.
+   :sample-rate          The global sample rate. This can be overridden on a
+                         per-event basis. (Integer. Optional. Default: 1)
+   :write-key            Your Honeycomb API key. (String. Required.)"
   [options]
   (let [c (client options)]
     (.closeOnShutdown c)
@@ -168,28 +253,65 @@
                                              :event-data map?
                                              :options ::send-options)))
 
-(defn ^{:arglists '([event-data]
-                    [event-data options]
-                    [honeycomb-client event-data]
-                    [honeycomb-client event-data options])}
+(def ^{:arglists '([event-data]
+                   [event-data options]
+                   [honeycomb-client event-data]
+                   [honeycomb-client event-data options])}
   send
-  "Send an event to Honeycomb.io"
-  [& args]
-  (let [[honeycomb-client event-data {:keys [pre-sampled] :as options}]
-        (if (instance? HoneyClient (first args))
-          args
-          (concat [*client*] args))]
-    (when (nil? honeycomb-client)
-      (throw (IllegalStateException. "Either call init or pass a valid HoneyClient as the first argument.")))
-    (let [event (create-event honeycomb-client event-data (or options {}))]
-      (if pre-sampled
-        (.sendPresampled event)
-        (.send event)))))
+  "Send an event to Honeycomb.io.
+
+   event-data       The fields to send for this event. These will be merged on
+                    top of the global fields configured in the HoneyClient.
+   honeycomb-client An optional HoneyClient instance to use as the API client.
+                    This is required if you have not already called init.
+   options          A map of event-specific options. Valid options are:
+                    :api-host     Override the :api-host set in the client.
+                                  (String. Optional.)
+                    :data-set     Override the :data-set set in the client.
+                                  (String. Optional.)
+                    :metadata     A map of metadata which you can set on each
+                                  event. This will not be sent to Honeycomb but
+                                  will be returned in every call to a function
+                                  in a ResponseObserver. This could allow you to
+                                  match a response to an originating event.
+                                  (Map. Optional.)
+                    :pre-sampled  Set this to true if you've already sampled the
+                                  data. Otherwise libhoney-java will sample it
+                                  for you. If you set this, you should ensure
+                                  that sample-rate is also supplied with a value
+                                  that reflects the sampling you did. (Boolean.
+                                  Optional. Default: false)
+                    :sample-rate  The sample rate for this event. If not
+                                  supplied, the sample rate configured for the
+                                  client library will be used. (Integer.
+                                  Optional.)
+                    :timestamp    Set an explicit timestamp for this event,
+                                  measured in milliseconds since the epoch.
+                                  (Integer. Optional. Default:
+                                  (System/currentTimeMillis))
+                    :write-key    Override the :write-key set in the client.
+                                  (String. Optional.)"
+  (fn [& args]
+    (let [[honeycomb-client event-data {:keys [pre-sampled] :as options}]
+          (if (instance? HoneyClient (first args))
+            args
+            (concat [*client*] args))]
+      (when (nil? honeycomb-client)
+        (throw (IllegalStateException. "Either call init or pass a valid HoneyClient as the first argument.")))
+      (let [event (create-event honeycomb-client event-data (or options {}))]
+        (if pre-sampled
+          (.sendPresampled event)
+          (.send event))))))
 
 (def ^:private ^:dynamic *event-data* (atom {}))
 
 (defn add-to-event
-  "From within a with-event form, add further fields to the event."
+  "From within a with-event form, add further fields to the event which will
+   be sent at the end of the with-event.
+
+   This can be called either with a single map to be (shallow) merged onto the
+   event's current data or with a key and value which will be associated onto
+   the event map."
   ([m]
    (swap! *event-data* merge m))
   ([k v]
@@ -197,8 +319,8 @@
 
 (defn- with-event-fn
   "A function implementing with-event. See with-event for documentation."
-  [initial-event-data event-options f]
-  (binding [*event-data* (atom initial-event-data)]
+  [event-data options f]
+  (binding [*event-data* (atom event-data)]
     (let [start (System/nanoTime)]
       (try
         (f)
@@ -207,13 +329,45 @@
           (throw t))
         (finally
           (add-to-event :elapsed-ms (/ (- (System/nanoTime) start) 1e6))
-          (send *client* @*event-data* event-options))))))
+          (send *client* @*event-data* options))))))
 
 (defmacro with-event
   "Wrap some code and send an event when the code is done.
 
-   initial-event-data Fields to add to the event.
-   event-options      Any options which you might need to pass to the third
-                      argument to the send function."
-  [initial-event-data event-options & body]
-  `(#'with-event-fn ~initial-event-data ~event-options (fn [] ~@body)))
+   event-data       The fields to send for this event. These will be merged on
+                    top of the global fields configured in the HoneyClient. The
+                    following additional keys will be added to the event data
+                    just before sending:
+                    :elapsed-ms   The number of milliseconds it took to execute
+                                  the body of this macro.
+                    :exception    If an exception was thrown, it will be added
+                                  to this field before being rethrown.
+   options          A map of event-specific options. Valid options are:
+                    :api-host     Override the :api-host set in the client.
+                                  (String. Optional.)
+                    :data-set     Override the :data-set set in the client.
+                                  (String. Optional.)
+                    :metadata     A map of metadata which you can set on each
+                                  event. This will not be sent to Honeycomb but
+                                  will be returned in every call to a function
+                                  in a ResponseObserver. This could allow you to
+                                  match a response to an originating event.
+                                  (Map. Optional.)
+                    :pre-sampled  Set this to true if you've already sampled the
+                                  data. Otherwise libhoney-java will sample it
+                                  for you. If you set this, you should ensure
+                                  that sample-rate is also supplied with a value
+                                  that reflects the sampling you did. (Boolean.
+                                  Optional. Default: false)
+                    :sample-rate  The sample rate for this event. If not
+                                  supplied, the sample rate configured for the
+                                  client library will be used. (Integer.
+                                  Optional.)
+                    :timestamp    Set an explicit timestamp for this event,
+                                  measured in milliseconds since the epoch.
+                                  (Integer. Optional. Default:
+                                  (System/currentTimeMillis))
+                    :write-key    Override the :write-key set in the client.
+                                  (String. Optional.)"
+  [event-data options & body]
+  `(#'with-event-fn ~event-data ~options (fn [] ~@body)))
