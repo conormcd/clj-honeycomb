@@ -22,6 +22,20 @@
                                              :sample-rate 3
                                              :write-key "bar"})]
       (is (instance? HoneyClient client))))
+  (testing "Global fields work"
+    (let [events (atom [])]
+      (with-open [client (tu/recording-client events
+                                              {:data-set "foo"
+                                               :global-fields (make-kitchen-sink)
+                                               :write-key "bar"})]
+        (is (instance? HoneyClient client))
+        (honeycomb/send client {:foo "bar"}))
+      (is (= 1 (count @events)))
+      (let [expected (assoc kitchen-sink-realized "foo" "bar")
+            event (->> @events first (.getFields) (into {}))]
+        (is (= (sort (keys expected)) (sort (keys event))))
+        (doseq [[k v] expected]
+          (is (= v (get event k)) k)))))
   (testing "The first argument must be an atom-wrapped vector"
     (is (thrown? IllegalArgumentException (tu/recording-client nil {})))
     (is (thrown? IllegalArgumentException (tu/recording-client (atom nil) {})))))
