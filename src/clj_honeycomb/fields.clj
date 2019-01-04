@@ -80,7 +80,10 @@
   (if (or (instance? IBlockingDeref x)
           (instance? IDeref x)
           (instance? IPending x)
-          (instance? Repeat x))
+          (instance? Repeat x)
+          (map? x)
+          (sequential? x)
+          (set? x))
     (->ValueSupplier realize-value x)
     x))
 

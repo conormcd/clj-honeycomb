@@ -56,14 +56,10 @@
     (is (= #{:double
              :exception
              :keyword
-             :list
              :long
-             :map
              :nil
              :ratio
-             :set
-             :string
-             :vector}
+             :string}
            (->> m
                 (remove (comp (partial instance? ValueSupplier) val))
                 (map key)
@@ -76,11 +72,15 @@
              :future-running
              :iterate
              :lazy-seq
+             :list
+             :map
              :promise-delivered
              :promise-pending
              :range
              :ref
              :repeat
+             :set
+             :vector
              :volatile}
            (->> m
                 (filter (comp (partial instance? ValueSupplier) val))
