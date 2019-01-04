@@ -7,6 +7,15 @@ wrapping [libhoney-java 1.0.2](https://github.com/honeycombio/libhoney-java).
 [![CircleCI](https://circleci.com/gh/conormcd/clj-honeycomb.svg?style=svg)](https://circleci.com/gh/conormcd/clj-honeycomb)
 [![codecov](https://codecov.io/gh/conormcd/clj-honeycomb/branch/master/graph/badge.svg)](https://codecov.io/gh/conormcd/clj-honeycomb)
 
+- [Usage](#usage)
+  - [Global and dynamic fields](#global-and-dynamic-fields)
+  - [Sampling](#sampling)
+  - [Monitoring](#monitoring)
+  - [Managing client state](#managing-client-state)
+  - [Testing](#testing)
+- [API Documentation](#api-documentation)
+- [License](#license)
+
 ## Usage
 
 Include the following in your `project.clj`:
@@ -173,6 +182,18 @@ to it.
     (honeycomb/send client {:foo "bar"}))
   ... events now contains the ResolvedEvent ...)
 ```
+
+## API Documentation
+
+Automatically generated API documentation is uploaded to GitHub Pages on every
+release. It can be viewed here:
+
+https://conormcd.github.io/clj-honeycomb/
+
+Since this library wraps `libhoney-java` it may also be useful to refer to the
+API documentation for that from time to time:
+
+https://honeycombio.github.io/libhoney-java/index.html?overview-summary.html
 
 ## License
 
