@@ -174,6 +174,18 @@ to it.
   ... events now contains the ResolvedEvent ...)
 ```
 
+## API Documentation
+
+Automatically generated API documentation is uploaded to GitHub Pages on every
+release. It can be viewed here:
+
+https://conormcd.github.io/clj-honeycomb/
+
+Since this library wraps `libhoney-java` it may also be useful to refer to the
+API documentation for that from time to time:
+
+https://honeycombio.github.io/libhoney-java/index.html?overview-summary.html
+
 ## License
 
 Copyright 2018-2019 Conor McDermottroe
