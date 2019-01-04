@@ -29,6 +29,14 @@
         (string? k) k
         :else (throw (IllegalArgumentException. "Field names must be keywords or strings"))))
 
+(defn- prepare-value-for-json
+  "Transform a Clojure value into something that will serialise nicely into JSON
+   when it's being sent to Honeycomb."
+  [v]
+  (cond (keyword? v) (str v)
+        (ratio? v) (float v)
+        :else v))
+
 (defn- realize-value
   "Clojure has several types which are not trivially transformed into JSON in
    the libhoney-java library. Things we're trying to avoid here are:
@@ -64,13 +72,7 @@
         (set? v)
         (mapv realize-value v)
 
-        (ratio? v)
-        (float v)
-
-        (keyword? v)
-        (str v)
-
-        :else v))
+        :else (prepare-value-for-json v)))
 
 (defn- maybe-value-supplier
   "Convert anything that is delay-like into a ValueSupplier for the Honeycomb
@@ -95,7 +97,8 @@
   [m]
   (let [m (->> m
                (map (fn [[k v]]
-                      [(stringify-key k) (maybe-value-supplier v)]))
+                      [(stringify-key k)
+                       (prepare-value-for-json (maybe-value-supplier v))]))
                (into {}))]
     [(->> m (remove (comp (partial instance? ValueSupplier) val)) (into {}))
      (->> m (filter (comp (partial instance? ValueSupplier) val)) (into {}))]))
