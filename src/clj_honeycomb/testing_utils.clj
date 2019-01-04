@@ -64,9 +64,9 @@
    (let [events (atom [])
          errors (atom [])]
      (try
-      (with-open [client (recording-client events client-options)]
-        (.addResponseObserver client (recording-response-observer errors))
-        (binding [honeycomb/*client* client]
-          (fn-that-sends-events)))
-      (finally
-       (fn-to-validate-events @events @errors))))))
+       (with-open [client (recording-client events client-options)]
+         (.addResponseObserver client (recording-response-observer errors))
+         (binding [honeycomb/*client* client]
+           (fn-that-sends-events)))
+       (finally
+         (fn-to-validate-events @events @errors))))))

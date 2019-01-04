@@ -201,13 +201,13 @@
   (binding [*event-data* (atom initial-event-data)]
     (let [start (System/nanoTime)]
       (try
-       (f)
-       (catch Throwable t
-         (add-to-event :exception t)
-         (throw t))
-       (finally
-        (add-to-event :elapsed-ms (/ (- (System/nanoTime) start) 1e6))
-        (send *client* @*event-data* event-options))))))
+        (f)
+        (catch Throwable t
+          (add-to-event :exception t)
+          (throw t))
+        (finally
+          (add-to-event :elapsed-ms (/ (- (System/nanoTime) start) 1e6))
+          (send *client* @*event-data* event-options))))))
 
 (defmacro with-event
   "Wrap some code and send an event when the code is done.
