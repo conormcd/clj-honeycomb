@@ -186,7 +186,7 @@
         (.sendPresampled event)
         (.send event)))))
 
-(def ^:dynamic *event-data* (atom {}))
+(def ^:private ^:dynamic *event-data* (atom {}))
 
 (defn add-to-event
   "From within a with-event form, add further fields to the event."
@@ -195,6 +195,20 @@
   ([k v]
    (swap! *event-data* assoc k v)))
 
+(defn- with-event-fn
+  "A function implementing with-event. See with-event for documentation."
+  [initial-event-data event-options f]
+  (binding [*event-data* (atom initial-event-data)]
+    (let [start (System/nanoTime)]
+      (try
+       (f)
+       (catch Throwable t
+         (add-to-event :exception t)
+         (throw t))
+       (finally
+        (add-to-event :elapsed-ms (/ (- (System/nanoTime) start) 1e6))
+        (send *client* @*event-data* event-options))))))
+
 (defmacro with-event
   "Wrap some code and send an event when the code is done.
 
@@ -202,13 +216,4 @@
    event-options      Any options which you might need to pass to the third
                       argument to the send function."
   [initial-event-data event-options & body]
-  `(binding [*event-data* (atom ~initial-event-data)]
-     (let [start# (System/nanoTime)]
-       (try
-         (do ~@body)
-         (catch Throwable t#
-           (add-to-event :exception t#)
-           (throw t#))
-         (finally
-           (add-to-event :elapsed-ms (/ (- (System/nanoTime) start#) 1e6))
-           (send @#'*client* @*event-data* ~event-options))))))
+  `(#'with-event-fn ~initial-event-data ~event-options (fn [] ~@body)))
