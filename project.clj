@@ -20,8 +20,11 @@
                  [io.honeycomb.libhoney/libhoney-java ~libhoney-version]]
   :pedantic? :abort
   :plugins [[lein-cljfmt "0.6.3"]
-            [lein-cloverage "1.0.13" :exclusions [org.clojure/clojure]]]
+            [lein-cloverage "1.0.13" :exclusions [org.clojure/clojure]]
+            [lein-codox "0.10.5"]]
   :profiles {:dev {:dependencies [[cloverage "1.0.13" :exclusions [org.clojure/clojure]]
                                   [org.clojure/data.json "0.2.6"]
                                   [org.slf4j/slf4j-simple "1.7.25"]
-                                  [se.haleby/stub-http "0.2.5"]]}})
+                                  [se.haleby/stub-http "0.2.5"]]
+                   :codox {:exclude-vars nil
+                           :namespaces :all}}})

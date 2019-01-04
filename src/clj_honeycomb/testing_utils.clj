@@ -9,7 +9,15 @@
 
 (defn recording-client
   "Create a HoneyClient which records all events sent by conj'ing them onto the
-   atom-wrapped vector supplied."
+   atom-wrapped vector supplied.
+
+   events         This must be an (atom []) which will be used to store all
+                  events sent using this client. Each element added will be an
+                  instance of io.honeycomb.libhoney.eventdata.ResolvedEvent.
+   client-options A map of options to pass to the client. This is the same as
+                  the options which can be passed to clj-honeycomb.core/init and
+                  clj-honeycomb.core/client. See the documentation for those
+                  functions for further details. (Map. Optional.)"
   [events client-options]
   (when-not (and (instance? Atom events) (vector? @events))
     (throw (IllegalArgumentException. "events must be a vector wrapped in an atom")))
@@ -55,7 +63,33 @@
 (defn validate-events
   "Execute some code that uses the implicit client created by
    clj-honeycomb.core/init but trap all events sent and pass them to a
-   validation function."
+   validation function.
+
+   Example:
+
+   (validate-events
+     (fn []
+       (with-event {\"foo\" \"bar\"}
+         ... some code ...))
+     (fn [events errors]
+       (is (empty? errors))
+       (is (= 1 (count events)))
+       ... further validation of events ...))
+
+   client-options        The options to pass to the client, if any. This is the
+                         same as the options passed to clj-honeycomb.core/init
+                         and clj-honeycomb.core/client. See the documentation
+                         for those functions for further details. (Map.
+                         Optional.)
+   fn-that-sends-events  A 0-arity function which runs some code that may send
+                         events using the implicit client created with
+                         clj-honeycomb.core/init.
+   fn-to-validate-events A function which takes two arguments. The first is a
+                         vector of io.honeycomb.libhoney.eventdata.ResolvedEvent
+                         objects for every event sent by the code in
+                         fn-that-sends-events. The second argument is a vector
+                         of io.honeycomb.libhoney.responses.Response for any
+                         errors that occurred during the sending of the events."
   ([fn-that-sends-events fn-to-validate-events]
    (validate-events {}
                     fn-that-sends-events

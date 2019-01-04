@@ -5,6 +5,9 @@ workflows:
   build-and-publish:
     jobs:
       - cache-deps
+      - docs:
+          requires:
+            - cache-deps
       - lint:
           requires:
             - cache-deps
@@ -14,6 +17,7 @@ workflows:
       - release:
           context: clj-honeycomb-release
           requires:
+            - docs
             - lint
             - test
           filters:
@@ -34,6 +38,17 @@ jobs:
           key: v1-m2-{{ checksum "project.clj" }}
           paths:
             - ~/.m2
+  docs:
+    docker:
+      - image: circleci/clojure
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-m2-{{ checksum "project.clj" }}
+      - run: lein codox
+      - store_artifacts:
+          path: target/doc
   lint:
     docker:
       - image: circleci/clojure
@@ -60,8 +75,24 @@ jobs:
     docker:
       - image: circleci/clojure
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "e1:44:a1:c0:2e:6f:08:ba:11:4e:b7:00:90:38:c3:4c"
       - checkout
       - restore_cache:
           keys:
             - v1-m2-{{ checksum "project.clj" }}
+      - run:
+          name: Publish the docs to GitHub Pages
+          command: |
+            git config --global user.email "${CIRCLE_PROJECT_USERNAME}@users.noreply.github.com"
+            git config --global user.name "${CIRCLE_PROJECT_USERNAME}"
+            git clone -b gh-pages git@github.com:${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git target/doc
+            lein codox
+            cd target/doc
+            git add .
+            git commit -m '[CI SKIP] Update documentation'
+            git push origin gh-pages
+            cd ../..
+            git clean -ffdx
       - run: lein deploy
