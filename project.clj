@@ -26,6 +26,7 @@
   :profiles {:dev {:dependencies [[cloverage "1.0.13" :exclusions [org.clojure/clojure]]
                                   [org.clojure/data.json "0.2.6"]
                                   [org.slf4j/slf4j-simple "1.7.25"]
+                                  [ring/ring-mock "0.3.2"]
                                   [se.haleby/stub-http "0.2.5"]]
                    :codox {:exclude-vars nil
                            :namespaces :all}}})
