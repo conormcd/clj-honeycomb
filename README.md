@@ -11,6 +11,7 @@ wrapping [libhoney-java 1.0.2](https://github.com/honeycombio/libhoney-java).
   - [Global and dynamic fields](#global-and-dynamic-fields)
   - [Sampling](#sampling)
   - [Pre- and Post-processing events](#pre--and-post-processing-events)
+  - [Middleware](#middleware)
   - [Monitoring](#monitoring)
   - [Managing client state](#managing-client-state)
   - [Testing](#testing)
@@ -140,6 +141,43 @@ method on that object will be called with a single, mutable
 object. This is called after sampling has taken place, so it will only be run
 on events which will be sent to Honeycomb.io. See the documentation for the
 EventPostProcessor class to understand the constraints on modifying the event.
+
+### Middleware
+
+#### Ring
+
+You can turn every request served by a Ring-compatible HTTP server into a
+Honeycomb event with `clj-honeycomb.middleware.ring/with-honeycomb-event`. By
+default the event will contain every item from the request map except for
+`:body` and from the response it will contain the status and all of the
+headers. You can customize the fields added to the event by passing an options
+map to the middleware.
+
+The following defines a custom honeycomb middleware that extracts only some
+of the request and response data but adds some static and dynamic fields.
+
+```clojure
+(def count-of-thingers
+  "An atom keeping track of the count of something, to demonstrate dynamic
+   fields. This will be dereferenced whenever the event fires."
+  (atom 0))
+
+(def my-custom-honeycomb-middleware
+  (partial with-honeycomb-event
+           {:honeycomb-event-data {:static-field "sent with every event"
+                                   :num-thingers count-of-thingers}
+            :extract-request-fields (fn [req]
+                                      {:num-headers (count (:headers req))})
+            :extract-response-fields (fn [res]
+                                       {:status (:status res)})}))
+
+; This will produce events that look like this:
+; {"elapsed-ms" 83.932
+;  "num-headers" 12
+;  "num-thingers" 3
+;  "static-field" "sent with every event"
+;  "status" 404}
+```
 
 ### Monitoring
 
