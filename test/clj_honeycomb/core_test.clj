@@ -2,6 +2,7 @@
   (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
 
             [clojure.data.json :as json]
+            [clojure.spec.test.alpha :refer (with-instrument-disabled)]
             [clojure.test :refer (are deftest is testing)]
 
             [stub-http.core :as stub-http]
@@ -220,21 +221,41 @@
       (is (instance? HoneyClient client)))))
 
 (deftest init-and-initialized?-works
-  (is (nil? @#'honeycomb/*client*))
-  (is (not (honeycomb/initialized?)))
-  (when (nil? @#'honeycomb/*client*)
-    (try
-      (let [options {:data-set "data-set"
-                     :write-key "write-key"}]
-        (with-open [client (honeycomb/client options)]
-          (is (not (honeycomb/initialized?)))
-          (is (= (bean client) (bean (honeycomb/init options))))
-          (is (= (bean client) (bean @#'honeycomb/*client*)))
-          (is (honeycomb/initialized?))))
-      (finally
-        (alter-var-root #'honeycomb/*client* (constantly nil)))))
-  (is (not (honeycomb/initialized?)))
-  (is (nil? @#'honeycomb/*client*)))
+  (testing "Initialize with a map"
+    (is (nil? @#'honeycomb/*client*))
+    (is (not (honeycomb/initialized?)))
+    (when (nil? @#'honeycomb/*client*)
+      (try
+        (let [options {:data-set "data-set"
+                       :write-key "write-key"}]
+          (with-open [client (honeycomb/client options)]
+            (is (not (honeycomb/initialized?)))
+            (is (= (bean client) (bean (honeycomb/init options))))
+            (is (= (bean client) (bean @#'honeycomb/*client*)))
+            (is (honeycomb/initialized?))))
+        (finally
+          (alter-var-root #'honeycomb/*client* (constantly nil)))))
+    (is (not (honeycomb/initialized?)))
+    (is (nil? @#'honeycomb/*client*)))
+  (testing "Initialize with a client"
+    (is (nil? @#'honeycomb/*client*))
+    (is (not (honeycomb/initialized?)))
+    (when (nil? @#'honeycomb/*client*)
+      (try
+        (let [options {:data-set "data-set"
+                       :write-key "write-key"}]
+          (with-open [client (honeycomb/client options)]
+            (is (not (honeycomb/initialized?)))
+            (is (= client (honeycomb/init client)))
+            (is (= client @#'honeycomb/*client*))
+            (is (honeycomb/initialized?))))
+        (finally
+          (alter-var-root #'honeycomb/*client* (constantly nil)))))
+    (is (not (honeycomb/initialized?)))
+    (is (nil? @#'honeycomb/*client*)))
+  (testing "The argument must be a client or a map"
+    (with-instrument-disabled
+      (is (thrown? IllegalArgumentException (honeycomb/init nil))))))
 
 (deftest create-event-works
   (with-open [honeycomb-client (honeycomb/client {:data-set "data-set"

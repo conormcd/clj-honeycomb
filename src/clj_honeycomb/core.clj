@@ -247,20 +247,31 @@
 (def ^:private ^:dynamic *client* nil)
 
 (s/fdef init
-  :args (s/cat :options ::client-options)
+  :args (s/alt :client (partial instance? HoneyClient)
+               :options-map ::client-options)
   :ret (partial instance? HoneyClient))
 
 (defn init
-  "Initialize this library by creating an internal, implicit client with the
-   supplied set of options.
+  "Initialize this library. Can be given either a HoneyClient instance to use
+   for all send calls which don't specify a client or a map which will be
+   passed to client to create a client.
 
-   options  A map of options to pass to the client function. See the
-            documentation for that function for details."
-  [options]
-  (let [c (client options)]
-    (.closeOnShutdown c)
-    (alter-var-root #'*client* (constantly c))
-    c))
+   client-or-options  Either an instance of HoneyClient or a map to pass to
+                      client to create one."
+  [client-or-options]
+  (let [client (cond (instance? HoneyClient client-or-options)
+                     client-or-options
+
+                     (map? client-or-options)
+                     (client client-or-options)
+
+                     :else
+                     (throw
+                      (IllegalArgumentException.
+                       "client-or-options must be a HoneyClient or a map.")))]
+    (.closeOnShutdown client)
+    (alter-var-root #'*client* (constantly client))
+    client))
 
 (s/fdef initialized?
   :args (s/cat)
