@@ -23,7 +23,8 @@
                                   LibHoney
                                   Options
                                   ResponseObserver
-                                  TransportOptions)))
+                                  TransportOptions)
+           (clj_honeycomb Client)))
 
 (s/def ::api-host string?)
 (s/def ::batch-size int?)
@@ -33,6 +34,7 @@
 (s/def ::connection-request-timeout int?)
 (s/def ::data-set string?)
 (s/def ::event-post-processor (partial instance? EventPostProcessor))
+(s/def ::event-pre-processor fn?)
 (s/def ::global-fields map?)
 (s/def ::io-thread-count int?)
 (s/def ::max-connections int?)
@@ -73,6 +75,7 @@
                    ::write-key]
           :opt-un [::api-host
                    ::event-post-processor
+                   ::event-pre-processor
                    ::global-fields
                    ::response-observer
                    ::sample-rate
@@ -238,8 +241,10 @@
   (let [co (client-options options)
         to (some-> (:transport-options options) transport-options)
         client (if to
-                 (LibHoney/create co to)
-                 (LibHoney/create co))]
+                 (Client. co to)
+                 (Client. co))]
+    (when-let [epp (:event-pre-processor options)]
+      (.setEventPreProcessor client epp))
     (when-let [ro (:response-observer options)]
       (.addResponseObserver client (response-observer ro)))
     client))
@@ -282,6 +287,11 @@
   []
   (some? *client*))
 
+(defn- honeycomb-client->event-pre-processor
+  [hc]
+  (when (instance? Client hc)
+    (.getEventPreProcessor hc)))
+
 (s/fdef create-event
   :args (s/cat :honeycomb-client (partial instance? HoneyClient)
                :event-data map?
@@ -294,20 +304,24 @@
 
 (defn- create-event
   "Create a Honeycomb event object."
-  [honeycomb-client event-data {:keys [api-host
-                                       data-set
-                                       metadata
-                                       sample-rate
-                                       timestamp
-                                       write-key]}]
-  (cond-> (.createEvent honeycomb-client)
-    api-host (.setApiHost (URI. api-host))
-    data-set (.setDataset data-set)
-    (not-empty event-data) (.addFields (fields/realize event-data))
-    (not-empty metadata) (.addMetadata metadata)
-    sample-rate (.setSampleRate sample-rate)
-    timestamp (.setTimestamp timestamp)
-    write-key (.setWriteKey write-key)))
+  [honeycomb-client event-data event-options]
+  (let [[event-data {:keys [api-host
+                            data-set
+                            metadata
+                            sample-rate
+                            timestamp
+                            write-key]}]
+        (if-let [epp (honeycomb-client->event-pre-processor honeycomb-client)]
+          (epp event-data event-options)
+          [event-data event-options])]
+    (cond-> (.createEvent honeycomb-client)
+      api-host (.setApiHost (URI. api-host))
+      data-set (.setDataset data-set)
+      (not-empty event-data) (.addFields (fields/realize event-data))
+      (not-empty metadata) (.addMetadata metadata)
+      sample-rate (.setSampleRate sample-rate)
+      timestamp (.setTimestamp timestamp)
+      write-key (.setWriteKey write-key))))
 
 (s/fdef send
   :args (s/alt :implicit-no-options (s/cat :event-data map?)

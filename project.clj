@@ -18,6 +18,7 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [clojure-future-spec "1.9.0"]
                  [io.honeycomb.libhoney/libhoney-java ~libhoney-version]]
+  :java-source-paths ["src-java"]
   :pedantic? :abort
   :plugins [[lein-cljfmt "0.6.3"]
             [lein-cloverage "1.0.13" :exclusions [org.clojure/clojure]]

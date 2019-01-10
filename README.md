@@ -10,6 +10,7 @@ wrapping [libhoney-java 1.0.2](https://github.com/honeycombio/libhoney-java).
 - [Usage](#usage)
   - [Global and dynamic fields](#global-and-dynamic-fields)
   - [Sampling](#sampling)
+  - [Pre- and Post-processing events](#pre--and-post-processing-events)
   - [Monitoring](#monitoring)
   - [Managing client state](#managing-client-state)
   - [Testing](#testing)
@@ -101,6 +102,44 @@ the `:sample-rate` key or individually on each `send` by passing a
 `sample-rate` in the options map which is the third argument to `send`. If you
 implement your own sampling, you must pass `{:sample-rate ... :pre-sampled
 true}` to each call to `send`.
+
+### Pre- and Post-processing events
+
+Events can be manipulated before they're sampled (with a clj-honeycomb
+pre-processor function) and after they're sampled (with a libhoney-java
+[EventPostProcessor](https://honeycombio.github.io/libhoney-java/io/honeycomb/libhoney/EventPostProcessor.html)).
+
+To pre-process an event before it's handed off to libhoney-java, add a
+function like `(fn [event-data options] ...)` to the `:event-pre-processor`
+optional argument to `init` which returns a tuple `[event-data options]`. The
+arguments and return value are identical to the arguments to
+`clj-honeycomb.core/send` and may be manipulated in any way so long as the
+returned value is a valid set of arguments for `send`.
+
+Example:
+
+```clojure
+(defn- event-pre-processor
+  "Add an extra field to the event data which is a count of the number of
+   fields being sent."
+  [event-data options]
+  [(merge event-data
+          {:num-items (inc (count event-data))})
+   options])
+
+(honeycomb/init {...
+                 :event-pre-processor event-pre-processor
+                 ...})
+```
+
+To post-process an event, add an
+[EventPostProcessor](https://honeycombio.github.io/libhoney-java/io/honeycomb/libhoney/EventPostProcessor.html)
+to the `:event-post-processor` optional argument to `init`. The `process`
+method on that object will be called with a single, mutable
+[EventData](https://honeycombio.github.io/libhoney-java/io/honeycomb/libhoney/eventdata/EventData.html)
+object. This is called after sampling has taken place, so it will only be run
+on events which will be sent to Honeycomb.io. See the documentation for the
+EventPostProcessor class to understand the constraints on modifying the event.
 
 ### Monitoring
 
