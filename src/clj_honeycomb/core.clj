@@ -22,19 +22,32 @@
                                   HoneyClient
                                   LibHoney
                                   Options
-                                  ResponseObserver)))
+                                  ResponseObserver
+                                  TransportOptions)))
 
 (s/def ::api-host string?)
+(s/def ::batch-size int?)
+(s/def ::batch-timeout-millis int?)
+(s/def ::buffer-size int?)
+(s/def ::connect-timeout int?)
+(s/def ::connection-request-timeout int?)
 (s/def ::data-set string?)
 (s/def ::event-post-processor (partial instance? EventPostProcessor))
 (s/def ::global-fields map?)
+(s/def ::io-thread-count int?)
+(s/def ::max-connections int?)
+(s/def ::max-connections-per-api-host int?)
+(s/def ::maximum-http-request-shutdown-wait int?)
+(s/def ::maximum-pending-batch-requests int?)
 (s/def ::metadata map?)
 (s/def ::on-client-rejected fn?)
 (s/def ::on-server-accepted fn?)
 (s/def ::on-server-rejected fn?)
 (s/def ::on-unknown fn?)
 (s/def ::pre-sampled boolean?)
+(s/def ::queue-capacity int?)
 (s/def ::sample-rate int?)
+(s/def ::socket-timeout int?)
 (s/def ::timestamp int?)
 (s/def ::write-key string?)
 (s/def ::response-observer
@@ -42,6 +55,19 @@
                    ::on-server-accepted
                    ::on-server-rejected
                    ::on-unknown]))
+(s/def ::transport-options
+  (s/keys :opt-un [::batch-size
+                   ::batch-timeout-millis
+                   ::buffer-size
+                   ::connection-request-timeout
+                   ::connect-timeout
+                   ::io-thread-count
+                   ::max-connections
+                   ::max-connections-per-api-host
+                   ::maximum-http-request-shutdown-wait
+                   ::maximum-pending-batch-requests
+                   ::queue-capacity
+                   ::socket-timeout]))
 (s/def ::client-options
   (s/keys :req-un [::data-set
                    ::write-key]
@@ -49,7 +75,8 @@
                    ::event-post-processor
                    ::global-fields
                    ::response-observer
-                   ::sample-rate]))
+                   ::sample-rate
+                   ::transport-options]))
 (s/def ::send-options
   (s/keys :opt-un [::api-host
                    ::data-set
@@ -81,6 +108,39 @@
       sample-rate (.setSampleRate sample-rate)
       write-key (.setWriteKey write-key)
       true (.build))))
+
+(s/fdef transport-options
+  :args (s/cat :options ::transport-options)
+  :ret (partial instance? TransportOptions))
+
+(defn- transport-options
+  "Turn a map into a TransportOptions object to initialize the LibHoney client."
+  [{:keys [batch-size
+           batch-timeout-millis
+           buffer-size
+           connection-request-timeout
+           connect-timeout
+           io-thread-count
+           max-connections
+           max-connections-per-api-host
+           maximum-http-request-shutdown-wait
+           maximum-pending-batch-requests
+           queue-capacity
+           socket-timeout]}]
+  (cond-> (LibHoney/transportOptions)
+    batch-size (.setBatchSize batch-size)
+    batch-timeout-millis (.setBatchTimeoutMillis batch-timeout-millis)
+    buffer-size (.setBufferSize buffer-size)
+    connection-request-timeout (.setConnectionRequestTimeout connection-request-timeout)
+    connect-timeout (.setConnectTimeout connect-timeout)
+    io-thread-count (.setIoThreadCount io-thread-count)
+    max-connections (.setMaxConnections max-connections)
+    max-connections-per-api-host (.setMaxConnectionsPerApiHost max-connections-per-api-host)
+    maximum-http-request-shutdown-wait (.setMaximumHttpRequestShutdownWait maximum-http-request-shutdown-wait)
+    maximum-pending-batch-requests (.setMaximumPendingBatchRequests maximum-pending-batch-requests)
+    queue-capacity (.setQueueCapacity queue-capacity)
+    socket-timeout (.setSocketTimeout socket-timeout)
+    true (.build)))
 
 (s/fdef response-observer
   :args (s/cat :response-observer ::response-observer)
@@ -150,9 +210,36 @@
                                              lifecycle of sending an event.
    :sample-rate          The global sample rate. This can be overridden on a
                          per-event basis. (Integer. Optional. Default: 1)
+   :transport-options    A map of options which can be used to configure the
+                         transport layer of libhoney-java. The defaults should
+                         be good enough for most applications. You should read
+                         and understand the documentation for
+                         io.honeycomb.libhoney.TransportOptions before changing
+                         any of these values. (Map. Optional.)
+
+                         Valid keys in this map are as follows, see the
+                         documentation for TransportOptions to understand their
+                         exact meanings.
+
+                         :batch-size
+                         :batch-timeout-millis
+                         :buffer-size
+                         :connection-request-timeout
+                         :connect-timeout
+                         :io-thread-count
+                         :max-connections
+                         :max-connections-per-api-host
+                         :maximum-http-request-shutdown-wait
+                         :maximum-pending-batch-requests
+                         :queue-capacity
+                         :socket-timeout
    :write-key            Your Honeycomb API key. (String. Required.)"
   [options]
-  (let [client (LibHoney/create (client-options options))]
+  (let [co (client-options options)
+        to (some-> (:transport-options options) transport-options)
+        client (if to
+                 (LibHoney/create co to)
+                 (LibHoney/create co))]
     (when-let [ro (:response-observer options)]
       (.addResponseObserver client (response-observer ro)))
     client))
@@ -167,40 +254,8 @@
   "Initialize this library by creating an internal, implicit client with the
    supplied set of options.
 
-   Valid options are:
-
-   :api-host             The base of the URL for all API calls to Honeycomb.
-                         (String. Optional. Default: \"https://api.honeycomb.io/\")
-   :data-set             The name of your Honeycomb dataset. (String. Required.)
-   :event-post-processor An instance of the libhoney-java class
-                         io.honeycomb.libhoney.EventPostProcessor which can be
-                         used to post-process event data after sampling but before
-                         sending the event to Honeycomb. (EventPostProcessor.
-                         Optional.)
-   :global-fields        A map of fields to include in every event. These fields
-                         can have dynamic values either by using an
-                         atom/delay/promise as its value or by supplying a
-                         ValueSupplier object as the value. Fields added to a
-                         given event will override these fields. (Map. Optional.)
-   :response-observer    A map of functions which will be called during the
-                         lifecycle of sending each event. (Map. Optional.)
-
-                         Keys in this map are:
-
-                         :on-client-rejected Called when the libhoney-java code
-                                             fails to send an event to
-                                             Honeycomb.
-                         :on-server-accepted Called when the Honeycomb server
-                                             has accepted the event. Be very
-                                             wary of supplying a function for
-                                             this, since it can be called a lot.
-                         :on-server-rejected Called when the Honeycomb server
-                                             rejects an event.
-                         :on-unknown         Called for all other errors in the
-                                             lifecycle of sending an event.
-   :sample-rate          The global sample rate. This can be overridden on a
-                         per-event basis. (Integer. Optional. Default: 1)
-   :write-key            Your Honeycomb API key. (String. Required.)"
+   options  A map of options to pass to the client function. See the
+            documentation for that function for details."
   [options]
   (let [c (client options)]
     (.closeOnShutdown c)

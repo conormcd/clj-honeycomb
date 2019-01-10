@@ -2,7 +2,7 @@
   (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
 
             [clojure.data.json :as json]
-            [clojure.test :refer (deftest is testing)]
+            [clojure.test :refer (are deftest is testing)]
 
             [stub-http.core :as stub-http]
 
@@ -12,6 +12,7 @@
            (io.honeycomb.libhoney EventPostProcessor
                                   HoneyClient
                                   Options
+                                  TransportOptions
                                   ValueSupplier)
            (io.honeycomb.libhoney.responses ClientRejected
                                             ServerAccepted
@@ -107,6 +108,70 @@
       (is (= 42 (.getSampleRate options)))
       (is (= "write-key" (.getWriteKey options))))))
 
+(deftest transport-options-works
+  ; By hardcoding these transport options here, this test will also detect
+  ; changes in the underlying libhoney-java library.
+  (let [default-transport-options {:batchSize 50
+                                   :batchTimeoutMillis 100
+                                   :bufferSize 8192
+                                   :connectTimeout 0
+                                   :connectionRequestTimeout 0
+                                   :ioThreadCount 4
+                                   :maxConnections 200
+                                   :maxHttpConnectionsPerApiHost 100
+                                   :maxPendingBatchRequests 250
+                                   :maximumHttpRequestShutdownWait 2000
+                                   :queueCapacity 10000
+                                   :socketTimeout 3000}
+        checks-out (fn [expected input]
+                     (let [to (#'honeycomb/transport-options input)]
+                       (and (instance? TransportOptions to)
+                            (integer? (.getIoThreadCount to))
+                            (pos? (.getIoThreadCount to))
+                            (= (-> to bean (dissoc :class :ioThreadCount))
+                               (dissoc expected :ioThreadCount)))))]
+    (are [input expected]
+         (checks-out expected input)
+
+      {}
+      default-transport-options
+
+      {:batch-size 100}
+      (assoc default-transport-options :batchSize 100)
+
+      {:batch-timeout-millis 200}
+      (assoc default-transport-options :batchTimeoutMillis 200)
+
+      {:buffer-size 1024}
+      (assoc default-transport-options :bufferSize 1024)
+
+      {:connection-request-timeout 1}
+      (assoc default-transport-options :connectionRequestTimeout 1)
+
+      {:connect-timeout 1}
+      (assoc default-transport-options :connectTimeout 1)
+
+      {:io-thread-count 1}
+      (assoc default-transport-options :ioThreadCount 1)
+
+      {:max-connections 100}
+      (assoc default-transport-options :maxConnections 100)
+
+      {:max-connections-per-api-host 150}
+      (assoc default-transport-options :maxHttpConnectionsPerApiHost 150)
+
+      {:maximum-http-request-shutdown-wait 1000}
+      (assoc default-transport-options :maximumHttpRequestShutdownWait 1000)
+
+      {:maximum-pending-batch-requests 125}
+      (assoc default-transport-options :maxPendingBatchRequests 125)
+
+      {:queue-capacity 1000}
+      (assoc default-transport-options :queueCapacity 1000)
+
+      {:socket-timeout 1000}
+      (assoc default-transport-options :socketTimeout 1000))))
+
 (deftest response-observer-works
   (let [client-rejected (reify ClientRejected)
         server-accepted (reify ServerAccepted)
@@ -141,6 +206,16 @@
   (testing "With a ResponseObserver"
     (with-open [client (honeycomb/client {:data-set "data-set"
                                           :response-observer {:on-unknown (fn [_] nil)}
+                                          :write-key "write-key"})]
+      (is (instance? HoneyClient client))))
+  (testing "With empty transport options"
+    (with-open [client (honeycomb/client {:data-set "data-set"
+                                          :transport-options {}
+                                          :write-key "write-key"})]
+      (is (instance? HoneyClient client))))
+  (testing "With non-empty transport options"
+    (with-open [client (honeycomb/client {:data-set "data-set"
+                                          :transport-options {:batch-size 10}
                                           :write-key "write-key"})]
       (is (instance? HoneyClient client)))))
 
