@@ -11,6 +11,13 @@
                                             ServerRejected
                                             Unknown)))
 
+(deftest no-op-client-works
+  (testing "Default options work"
+    (is (instance? HoneyClient (tu/no-op-client {}))))
+  (testing "Sending events works"
+    (with-open [client (tu/no-op-client {})]
+      (honeycomb/send client {:foo "bar"}))))
+
 (deftest recording-client-works
   (testing "Default options work"
     (is (instance? HoneyClient (tu/recording-client (atom []) {}))))

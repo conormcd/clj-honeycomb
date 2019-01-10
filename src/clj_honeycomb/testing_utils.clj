@@ -7,20 +7,18 @@
            (io.honeycomb.libhoney.responses ResponseObservable)
            (io.honeycomb.libhoney.transport Transport)))
 
-(defn recording-client
-  "Create a HoneyClient which records all events sent by conj'ing them onto the
-   atom-wrapped vector supplied.
+(defn- dummy-client
+  "Create a HoneyClient that behaves entirely like a regular one but instead
+   of sending the event it calls submission-fn with the event. This happens as
+   deep into libhoney-java as possible, so it exercises most of the library.
 
-   events         This must be an (atom []) which will be used to store all
-                  events sent using this client. Each element added will be an
-                  instance of io.honeycomb.libhoney.eventdata.ResolvedEvent.
    client-options A map of options to pass to the client. This is the same as
                   the options which can be passed to clj-honeycomb.core/init and
                   clj-honeycomb.core/client. See the documentation for those
-                  functions for further details. (Map. Optional.)"
-  [events client-options]
-  (when-not (and (instance? Atom events) (vector? @events))
-    (throw (IllegalArgumentException. "events must be a vector wrapped in an atom")))
+                  functions for further details. (Map.)
+   submission-fn  A function (fn [event] ...) to \"send\" the events sent via
+                  this client."
+  [client-options submission-fn]
   (let [ro (ResponseObservable.)
         transport (reify Transport
                     (close [_this]
@@ -31,7 +29,7 @@
                       (.markEnqueueTime event)
                       (.markStartOfHttpRequest event)
                       (.markEndOfHttpRequest event)
-                      (swap! events conj event)
+                      (submission-fn event)
                       true))
         ro (when (:response-observer client-options)
              (#'honeycomb/response-observer (:response-observer client-options)))
@@ -43,6 +41,34 @@
     (when ro
       (.addResponseObserver client ro))
     client))
+
+(defn no-op-client
+  "Create a HoneyClient that drops every event on the floor. Useful both for
+   testing and possibly also for production code that needs a valid client but
+   wants to disable event sending for some reason.
+
+   client-options A map of options to pass to the client. This is the same as
+                  the options which can be passed to clj-honeycomb.core/init and
+                  clj-honeycomb.core/client. See the documentation for those
+                  functions for further details. (Map.)"
+  [client-options]
+  (dummy-client client-options (fn [_event] nil)))
+
+(defn recording-client
+  "Create a HoneyClient which records all events sent by conj'ing them onto the
+   atom-wrapped vector supplied.
+
+   events         This must be an (atom []) which will be used to store all
+                  events sent using this client. Each element added will be an
+                  instance of io.honeycomb.libhoney.eventdata.ResolvedEvent.
+   client-options A map of options to pass to the client. This is the same as
+                  the options which can be passed to clj-honeycomb.core/init and
+                  clj-honeycomb.core/client. See the documentation for those
+                  functions for further details. (Map.)"
+  [events client-options]
+  (when-not (and (instance? Atom events) (vector? @events))
+    (throw (IllegalArgumentException. "events must be a vector wrapped in an atom")))
+  (dummy-client client-options (partial swap! events conj)))
 
 (defn- recording-response-observer
   "A ResponseObserver that will record all the received errors in the supplied
