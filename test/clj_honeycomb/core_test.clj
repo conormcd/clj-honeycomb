@@ -218,7 +218,12 @@
     (with-open [client (honeycomb/client {:data-set "data-set"
                                           :transport-options {:batch-size 10}
                                           :write-key "write-key"})]
-      (is (instance? HoneyClient client)))))
+      (is (instance? HoneyClient client))))
+  (testing "We can add an event pre-processor"
+    (with-open [client (honeycomb/client {:data-set "data-set"
+                                          :event-pre-processor (fn [event-data options]
+                                                                 [event-data options])
+                                          :write-key "write-key"})])))
 
 (deftest init-and-initialized?-works
   (testing "Initialize with a map"
@@ -292,23 +297,51 @@
         (is (= {} (.getMetadata event)))
         (is (= 1 (.getSampleRate event)))
         (is (nil? (.getTimestamp event)))
-        (is (= "write-key" (.getWriteKey event))))
-      (testing "Options get set on the event"
-        (let [event (#'honeycomb/create-event honeycomb-client
-                                              {}
-                                              {:api-host "https://localhost:123/"
-                                               :data-set "foo"
-                                               :metadata {:event-id 42}
-                                               :sample-rate 3
-                                               :timestamp 123456
-                                               :write-key "bar"})]
-          (is (= "https://localhost:123/" (str (.getApiHost event))))
-          (is (= "foo" (.getDataset event)))
-          (is (= {} (.getFields event)))
-          (is (= {:event-id 42} (.getMetadata event)))
-          (is (= 3 (.getSampleRate event)))
-          (is (= 123456 (.getTimestamp event)))
-          (is (= "bar" (.getWriteKey event))))))))
+        (is (= "write-key" (.getWriteKey event)))))
+    (testing "Options get set on the event"
+      (let [event (#'honeycomb/create-event honeycomb-client
+                                            {}
+                                            {:api-host "https://localhost:123/"
+                                             :data-set "foo"
+                                             :metadata {:event-id 42}
+                                             :sample-rate 3
+                                             :timestamp 123456
+                                             :write-key "bar"})]
+        (is (= "https://localhost:123/" (str (.getApiHost event))))
+        (is (= "foo" (.getDataset event)))
+        (is (= {} (.getFields event)))
+        (is (= {:event-id 42} (.getMetadata event)))
+        (is (= 3 (.getSampleRate event)))
+        (is (= 123456 (.getTimestamp event)))
+        (is (= "bar" (.getWriteKey event)))))
+    (testing "Event pre-processor runs"
+      (with-open [client (honeycomb/client {:data-set "data-set"
+                                            :event-pre-processor (fn [event-data options]
+                                                                   [(assoc event-data :integer 1) options])
+                                            :write-key "write-key"})]
+        (let [event (#'honeycomb/create-event client
+                                              {:nil nil
+                                               :string "string"
+                                               :integer 42
+                                               :float Math/E
+                                               :fraction 22/7
+                                               :atom (atom 3)
+                                               :delay (delay 4)}
+                                              {})]
+          (is (= "https://api.honeycomb.io/" (str (.getApiHost event))))
+          (is (= "data-set" (.getDataset event)))
+          (is (= {"nil" nil
+                  "string" "string"
+                  "integer" 1
+                  "float" Math/E
+                  "fraction" (float 22/7)
+                  "atom" 3
+                  "delay" 4}
+                 (.getFields event)))
+          (is (= {} (.getMetadata event)))
+          (is (= 1 (.getSampleRate event)))
+          (is (nil? (.getTimestamp event)))
+          (is (= "write-key" (.getWriteKey event))))))))
 
 (deftest send-works
   (testing "One argument"

@@ -5,7 +5,8 @@
            (io.honeycomb.libhoney HoneyClient
                                   ResponseObserver)
            (io.honeycomb.libhoney.responses ResponseObservable)
-           (io.honeycomb.libhoney.transport Transport)))
+           (io.honeycomb.libhoney.transport Transport)
+           (clj_honeycomb Client)))
 
 (defn- dummy-client
   "Create a HoneyClient that behaves entirely like a regular one but instead
@@ -37,7 +38,7 @@
                         (merge {:data-set "data-set"
                                 :write-key "write-key"}
                                client-options))
-        client (HoneyClient. client-options transport)]
+        client (Client. client-options transport)]
     (when ro
       (.addResponseObserver client ro))
     client))
