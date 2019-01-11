@@ -16,19 +16,6 @@
       (is (instance? ValueSupplier v))
       (is (= 2 (.supply v))))))
 
-(deftest stringify-key-works
-  (testing "Happy path"
-    (are [input expected]
-         (= expected (#'fields/stringify-key input))
-
-      :key "key"
-      :key/name "key/name"
-      "String" "String"))
-  (testing "Sad path"
-    (is (thrown? IllegalArgumentException (#'fields/stringify-key nil)))
-    (is (thrown? IllegalArgumentException (#'fields/stringify-key 1)))
-    (is (thrown? IllegalArgumentException (#'fields/stringify-key [1])))))
-
 (deftest realize-value-works
   (testing "Testing the kitchen sink"
     (let [kitchen-sink (atom (make-kitchen-sink))
@@ -95,9 +82,7 @@
     (let [[static-fields dynamic-fields] (fields/separate {:foo (atom 42)})]
       (is (= {} static-fields))
       (is (= 1 (count dynamic-fields)))
-      (is (= 42 (.supply ^ValueSupplier (get dynamic-fields "foo"))))))
-  (testing "Keys must be keywords or strings"
-    (is (thrown? IllegalArgumentException (fields/separate {1 1})))))
+      (is (= 42 (.supply ^ValueSupplier (get dynamic-fields "foo")))))))
 
 (deftest realize-works
   (is (= kitchen-sink-realized (fields/realize (make-kitchen-sink)))))

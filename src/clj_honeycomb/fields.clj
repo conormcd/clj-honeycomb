@@ -8,6 +8,7 @@
 
    Only the ->ValueSupplier function in this namespace should be considered part
    of the public API for clj-honeycomb."
+  (:require [clj-honeycomb.util.map :as util-map])
   (:import (clojure.lang IBlockingDeref
                          IDeref
                          IPending
@@ -20,16 +21,6 @@
   (reify ValueSupplier
     (supply [_this]
       (apply f args))))
-
-(defn- stringify-key
-  "Field names must be strings but Clojure maps typically have keywords for keys
-   so here we coalesce strings and keywords to strings."
-  [k]
-  (cond (keyword? k) (if-let [n (namespace k)]
-                       (str n "/" (name k))
-                       (name k))
-        (string? k) k
-        :else (throw (IllegalArgumentException. "Field names must be keywords or strings"))))
 
 (defn- prepare-value-for-json
   "Transform a Clojure value into something that will serialise nicely into JSON
@@ -68,7 +59,7 @@
         (map? v)
         (->> v
              (map (fn [[k v]]
-                    [(stringify-key k) (realize-value v)]))
+                    [k (realize-value v)]))
              (into {}))
 
         (set? v)
@@ -98,9 +89,9 @@
    the submap of the input where all the values are ValueSuppliers."
   [m]
   (let [m (->> m
+               util-map/stringify-keys
                (map (fn [[k v]]
-                      [(stringify-key k)
-                       (prepare-value-for-json (maybe-value-supplier v))]))
+                      [k (prepare-value-for-json (maybe-value-supplier v))]))
                (into {}))]
     [(->> m (remove (comp (partial instance? ValueSupplier) val)) (into {}))
      (->> m (filter (comp (partial instance? ValueSupplier) val)) (into {}))]))
@@ -111,6 +102,7 @@
    are computed as late as possible."
   [m]
   (->> m
+       util-map/stringify-keys
        (map (fn [[k v]]
-              [(stringify-key k) (realize-value v)]))
+              [k (realize-value v)]))
        (into {})))

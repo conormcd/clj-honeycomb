@@ -1,7 +1,8 @@
 (ns clj-honeycomb.global-fixtures
   "A combination of functions that must get called once and early during
    testing and some global testing data."
-  (:require [clojure.spec.test.alpha :as stest]))
+  (:require [clojure.spec.test.alpha :as stest]
+            [ring.mock.request :as mock-request]))
 
 ;; Functions which we want called once and early during testing.
 (set! *warn-on-reflection* true)
@@ -111,3 +112,28 @@
        "volatile" 3}
       ((fn [x]
          (assoc x "map" (dissoc x "exception"))))))
+
+(def sample-ring-request
+  (mock-request/request :get "/foo?bar=bar&baz=baz"))
+
+(def sample-ring-request-extracted
+  {"ring.request.headers.host" "localhost"
+   "ring.request.protocol" "HTTP/1.1"
+   "ring.request.query-string" "bar=bar&baz=baz"
+   "ring.request.remote-addr" "localhost"
+   "ring.request.request-method" :get
+   "ring.request.scheme" :http
+   "ring.request.server-name" "localhost"
+   "ring.request.server-port" 80
+   "ring.request.uri" "/foo"})
+
+(def sample-ring-response
+  {:body "Hello world!"
+   :headers {"Content-Type" "text/plain"
+             :some-other-header :ring-is-funny}
+   :status 200})
+
+(def sample-ring-response-extracted
+  {"ring.response.headers.Content-Type" "text/plain"
+   "ring.response.headers.some-other-header" :ring-is-funny
+   "ring.response.status" 200})
