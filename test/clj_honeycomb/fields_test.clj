@@ -1,10 +1,19 @@
 (ns clj-honeycomb.fields-test
+  (:use [clojure.future])
   (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
 
+            [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
+            [clojure.spec.test.alpha :refer (with-instrument-disabled)]
             [clojure.test :refer (are deftest is testing)]
 
             [clj-honeycomb.fields :as fields])
-  (:import (io.honeycomb.libhoney ValueSupplier)))
+  (:import (java.util UUID)
+           (clojure.lang IBlockingDeref
+                         IDeref
+                         IPending
+                         Repeat)
+           (io.honeycomb.libhoney ValueSupplier)))
 
 (deftest ->ValueSupplier-works
   (testing "Simple no-arg function"
@@ -15,6 +24,26 @@
     (let [v (fields/->ValueSupplier inc 1)]
       (is (instance? ValueSupplier v))
       (is (= 2 (.supply ^ValueSupplier v))))))
+
+(deftest prepare-value-for-json-works
+  (testing "Known values"
+    (let [uuid (UUID/randomUUID)]
+      (are [input expected]
+           (= expected (#'fields/prepare-value-for-json input))
+
+        nil nil
+        1 1
+        1.0 1.0
+        2/4 0.5
+        "string" "string"
+        :keyword ":keyword"
+        uuid (str uuid))))
+  (testing "Randomly generated values"
+    (doseq [input (gen/sample (s/gen any?))]
+      (let [output (#'fields/prepare-value-for-json input)]
+        (is (not (or (keyword? output)
+                     (ratio? output)
+                     (instance? UUID output))))))))
 
 (deftest realize-value-works
   (testing "Testing the kitchen sink"
@@ -33,47 +62,66 @@
         (swap! kitchen-sink dissoc k)
         (swap! expected dissoc k))))
   (testing "Make sure we cover ValueSuppliers too"
-    (is (= 2 (#'fields/realize-value (fields/->ValueSupplier inc 1))))))
+    (is (= 2 (#'fields/realize-value (fields/->ValueSupplier inc 1)))))
+  (testing "Randomly generated data"
+    (doseq [input (gen/sample (s/gen any?))]
+      (let [output (#'fields/realize-value input)]
+        (is (not (or (instance? IBlockingDeref output)
+                     (instance? IDeref output)
+                     (instance? IPending output)
+                     (instance? Repeat output)
+                     (instance? ValueSupplier output))))))))
 
 (deftest maybe-value-supplier-works
-  (let [m (->> (make-kitchen-sink)
-               (map (fn [[k v]]
-                      [k (#'fields/maybe-value-supplier v)]))
-               (into {}))]
-    (is (= #{:double
-             :exception
-             :keyword
-             :long
-             :nil
-             :ratio
-             :string
-             :uuid}
-           (->> m
-                (remove (comp (partial instance? ValueSupplier) val))
-                (map key)
-                set)))
-    (is (= #{:agent
-             :atom
-             :cycle
-             :delay
-             :future-finished
-             :future-running
-             :iterate
-             :lazy-seq
-             :list
-             :map
-             :promise-delivered
-             :promise-pending
-             :range
-             :ref
-             :repeat
-             :set
-             :vector
-             :volatile}
-           (->> m
-                (filter (comp (partial instance? ValueSupplier) val))
-                (map key)
-                set)))))
+  (testing "Known values"
+    (let [m (->> (make-kitchen-sink)
+                 (map (fn [[k v]]
+                        [k (#'fields/maybe-value-supplier v)]))
+                 (into {}))]
+      (is (= #{:double
+               :exception
+               :keyword
+               :long
+               :nil
+               :ratio
+               :string
+               :uuid}
+             (->> m
+                  (remove (comp (partial instance? ValueSupplier) val))
+                  (map key)
+                  set)))
+      (is (= #{:agent
+               :atom
+               :cycle
+               :delay
+               :future-finished
+               :future-running
+               :iterate
+               :lazy-seq
+               :list
+               :map
+               :promise-delivered
+               :promise-pending
+               :range
+               :ref
+               :repeat
+               :set
+               :vector
+               :volatile}
+             (->> m
+                  (filter (comp (partial instance? ValueSupplier) val))
+                  (map key)
+                  set)))))
+  (testing "Randomly generated data"
+    (doseq [input (gen/sample (s/gen any?))]
+      (let [output (#'fields/maybe-value-supplier input)]
+        (is (not (or (instance? IBlockingDeref output)
+                     (instance? IDeref output)
+                     (instance? IPending output)
+                     (instance? Repeat output)
+                     (map? output)
+                     (sequential? output)
+                     (set? output))))))))
 
 (deftest separate-works
   (testing "Static fields are passed through unchanged"
@@ -83,7 +131,28 @@
     (let [[static-fields dynamic-fields] (fields/separate {:foo (atom 42)})]
       (is (= {} static-fields))
       (is (= 1 (count dynamic-fields)))
-      (is (= 42 (.supply ^ValueSupplier (get dynamic-fields "foo")))))))
+      (is (= 42 (.supply ^ValueSupplier (get dynamic-fields "foo"))))))
+  (testing "Invalid input"
+    (with-instrument-disabled
+      (is (thrown? IllegalArgumentException (fields/separate nil)))
+      (is (thrown? IllegalArgumentException (fields/separate 1)))
+      (is (thrown? IllegalArgumentException (fields/separate [])))))
+  (testing "Randomly generated data"
+    (doseq [input (gen/sample (s/gen map?))]
+      (let [output (fields/separate input)]
+        (is (= 2 (count output)))
+        (is (every? map? output))))))
 
 (deftest realize-works
-  (is (= kitchen-sink-realized (fields/realize (make-kitchen-sink)))))
+  (testing "Test the kitchen sink"
+    (is (= kitchen-sink-realized (fields/realize (make-kitchen-sink)))))
+  (testing "Invalid input"
+    (with-instrument-disabled
+      (is (thrown? IllegalArgumentException (fields/realize nil)))
+      (is (thrown? IllegalArgumentException (fields/realize 1)))
+      (is (thrown? IllegalArgumentException (fields/realize [])))))
+  (testing "Randomly generated data"
+    (doseq [input (gen/sample (s/gen map?))]
+      (let [output (fields/realize input)]
+        (is (map? output))
+        (is (every? string? (keys output)))))))

@@ -8,7 +8,10 @@
 
    Only the ->ValueSupplier function in this namespace should be considered part
    of the public API for clj-honeycomb."
-  (:require [clj-honeycomb.util.map :as util-map])
+  (:use [clojure.future])
+  (:require [clojure.spec.alpha :as s]
+
+            [clj-honeycomb.util.map :as util-map])
   (:import (java.util UUID)
            (clojure.lang IBlockingDeref
                          IDeref
@@ -16,12 +19,21 @@
                          Repeat)
            (io.honeycomb.libhoney ValueSupplier)))
 
+(s/fdef ->ValueSupplier
+  :args (s/cat :f fn?
+               :args (s/* any?))
+  :ret (partial instance? ValueSupplier))
+
 (defn ->ValueSupplier
   "Convert a function to a ValueSupplier so that it can act as a dynamic field."
   [f & args]
   (reify ValueSupplier
     (supply [_this]
       (apply f args))))
+
+(s/fdef prepare-value-for-json
+  :args (s/cat :v any?)
+  :ret any?)
 
 (defn- prepare-value-for-json
   "Transform a Clojure value into something that will serialise nicely into JSON
@@ -31,6 +43,10 @@
         (ratio? v) (float v)
         (instance? UUID v) (str v)
         :else v))
+
+(s/fdef realize-value
+  :args (s/cat :v any?)
+  :ret any?)
 
 (defn- realize-value
   "Clojure has several types which are not trivially transformed into JSON in
@@ -69,6 +85,10 @@
 
         :else (prepare-value-for-json v)))
 
+(s/fdef maybe-value-supplier
+  :args (s/cat :v any?)
+  :ret any?)
+
 (defn- maybe-value-supplier
   "Convert anything that is delay-like into a ValueSupplier for the Honeycomb
    Java SDK. This delays the evaluation of these things until the point of event
@@ -84,12 +104,18 @@
     (->ValueSupplier realize-value x)
     x))
 
+(s/fdef separate
+  :args (s/cat :m map?)
+  :ret (s/tuple map?))
+
 (defn ^:no-doc separate
   "Given a map, stringify the keys and convert any values that should be
    ValueSuppliers into them. Then return a tuple where the first item is the
    submap of the input where no values are ValueSuppliers and the second item is
    the submap of the input where all the values are ValueSuppliers."
   [m]
+  (when-not (map? m)
+    (throw (IllegalArgumentException. "The first argument to separate must be a map.")))
   (let [m (->> m
                util-map/stringify-keys
                (map (fn [[k v]]
@@ -98,11 +124,17 @@
     [(->> m (remove (comp (partial instance? ValueSupplier) val)) (into {}))
      (->> m (filter (comp (partial instance? ValueSupplier) val)) (into {}))]))
 
+(s/fdef realize
+  :args (s/cat :m map?)
+  :ret map?)
+
 (defn ^:no-doc realize
   "Given a map, stringify the keys and realize all the values. This must be done
    at the last minute before sending an event so that any dynamic/delayed fields
    are computed as late as possible."
   [m]
+  (when-not (map? m)
+    (throw (IllegalArgumentException. "The first argument to realize must be a map.")))
   (->> m
        util-map/stringify-keys
        (map (fn [[k v]]

@@ -1,6 +1,9 @@
 (ns clj-honeycomb.testing-utils
   "Functions to make it easier to test code that uses clj-honeycomb."
-  (:require [clj-honeycomb.core :as honeycomb])
+  (:use [clojure.future])
+  (:require [clojure.spec.alpha :as s]
+
+            [clj-honeycomb.core :as honeycomb])
   (:import (clojure.lang Atom)
            (io.honeycomb.libhoney HoneyClient
                                   Options
@@ -8,6 +11,11 @@
            (io.honeycomb.libhoney.responses ResponseObservable)
            (io.honeycomb.libhoney.transport Transport)
            (clj_honeycomb Client)))
+
+(s/fdef dummy-client
+  :args (s/cat :client-options :clj-honeycomb.core/client-options
+               :submission-fn fn?)
+  :ret (partial instance? HoneyClient))
 
 (defn- dummy-client
   "Create a HoneyClient that behaves entirely like a regular one but instead
@@ -33,16 +41,17 @@
                       (.markEndOfHttpRequest event)
                       (submission-fn event)
                       true))
-        ro (when (:response-observer client-options)
-             (#'honeycomb/response-observer (:response-observer client-options)))
-        ^Options client-options (#'honeycomb/client-options
-                                 (merge {:data-set "data-set"
-                                         :write-key "write-key"}
-                                        client-options))
-        client (Client. client-options transport)]
-    (when ro
-      (.addResponseObserver client ro))
+        client (Client. ^Options (#'honeycomb/client-options client-options)
+                        ^Transport transport)]
+    (when-let [epp (:event-pre-processor client-options)]
+      (.setEventPreProcessor client epp))
+    (when-let [ro (:response-observer client-options)]
+      (.addResponseObserver client (#'honeycomb/response-observer ro)))
     client))
+
+(s/fdef no-op-client
+  :args (s/cat :client-options :clj-honeycomb.core/client-options)
+  :ret (partial instance? HoneyClient))
 
 (defn ^Client no-op-client
   "Create a HoneyClient that drops every event on the floor. Useful both for
@@ -55,6 +64,11 @@
                   functions for further details. (Map.)"
   [client-options]
   (dummy-client client-options (fn [_event] nil)))
+
+(s/fdef recording-client
+  :args (s/cat :events (partial instance? Atom)
+               :client-options :clj-honeycomb.core/client-options)
+  :ret (partial instance? HoneyClient))
 
 (defn ^Client recording-client
   "Create a HoneyClient which records all events sent by conj'ing them onto the
@@ -72,6 +86,10 @@
     (throw (IllegalArgumentException. "events must be a vector wrapped in an atom")))
   (dummy-client client-options (partial swap! events conj)))
 
+(s/fdef recording-response-observer
+  :args (s/cat :errors (partial instance? Atom))
+  :ret (partial instance? ResponseObserver))
+
 (defn- recording-response-observer
   "A ResponseObserver that will record all the received errors in the supplied
    atom-wrapped vector."
@@ -87,6 +105,13 @@
       (swap! errors conj sr))
     (onUnknown [_this u]
       (swap! errors conj u))))
+
+(s/fdef validate-events
+  :args (s/alt :without-options (s/cat :fn-that-sends-events fn?
+                                       :fn-to-validate-events fn?)
+               :with-options (s/cat :client-options :clj-honeycomb.core/client-options
+                                    :fn-that-sends-events fn?
+                                    :fn-to-validate-events fn?)))
 
 (defn validate-events
   "Execute some code that uses the implicit client created by
@@ -119,7 +144,8 @@
                          of io.honeycomb.libhoney.responses.Response for any
                          errors that occurred during the sending of the events."
   ([fn-that-sends-events fn-to-validate-events]
-   (validate-events {}
+   (validate-events {:data-set "data-set"
+                     :write-key "write-key"}
                     fn-that-sends-events
                     fn-to-validate-events))
   ([client-options fn-that-sends-events fn-to-validate-events]

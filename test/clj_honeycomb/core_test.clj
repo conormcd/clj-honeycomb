@@ -2,6 +2,8 @@
   (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
 
             [clojure.data.json :as json]
+            [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
             [clojure.spec.test.alpha :refer (with-instrument-disabled)]
             [clojure.test :refer (are deftest is testing)]
 
@@ -29,6 +31,10 @@
   [^Event event]
   (when event
     (into {} (.getFields event))))
+
+(deftest client-options-random-generations
+  (doseq [co (gen/sample (s/gen :clj-honeycomb.core/client-options))]
+    (is (instance? Options (#'honeycomb/client-options co)))))
 
 (deftest client-options-works
   (testing "It fails when it's missing both data-set and write-key"
@@ -119,6 +125,10 @@
       (is (= 42 (.getSampleRate options)))
       (is (= "write-key" (.getWriteKey options))))))
 
+(deftest transport-options-random-generations
+  (doseq [to (gen/sample (s/gen :clj-honeycomb.core/transport-options))]
+    (is (instance? TransportOptions (#'honeycomb/transport-options to)))))
+
 (deftest transport-options-works
   ; By hardcoding these transport options here, this test will also detect
   ; changes in the underlying libhoney-java library.
@@ -207,7 +217,15 @@
         (.onClientRejected ro client-rejected)
         (.onServerAccepted ro server-accepted)
         (.onServerRejected ro server-rejected)
-        (.onUnknown ro unknown)))))
+        (.onUnknown ro unknown)))
+    (testing "Randomly generated values work"
+      (doseq [ro (gen/sample (s/gen :clj-honeycomb.core/response-observer))]
+        (let [^ResponseObserver ro (#'honeycomb/response-observer ro)]
+          (is (instance? ResponseObserver ro))
+          (.onClientRejected ro client-rejected)
+          (.onServerAccepted ro server-accepted)
+          (.onServerRejected ro server-rejected)
+          (.onUnknown ro unknown))))))
 
 (deftest client-works
   (testing "Without a ResponseObserver"
@@ -368,22 +386,26 @@
          (is (= {"foo" "bar"} (event->fields (first events))))))))
   (testing "Two arguments works"
     (let [events (atom [])]
-      (with-open [client (recording-client events {})]
+      (with-open [client (recording-client events {:data-set "data-set"
+                                                   :write-key "write-key"})]
         (honeycomb/send client {:foo "bar"}))
       (is (= 1 (count @events)))
       (is (= {"foo" "bar"} (event->fields (first @events))))))
   (testing "Three arguments works"
     (let [events (atom [])]
-      (with-open [client (recording-client events {})]
+      (with-open [client (recording-client events {:data-set "data-set"
+                                                   :write-key "write-key"})]
         (honeycomb/send client {:foo "bar"} {:pre-sampled true}))
       (is (= 1 (count @events)))
       (is (= {"foo" "bar"} (event->fields (first @events))))))
   (testing "Global fields get sent"
     (let [dynamic-field (atom 1)
           events (atom [])]
-      (with-open [client (recording-client events {:global-fields
+      (with-open [client (recording-client events {:data-set "data-set"
+                                                   :global-fields
                                                    {:dynamic dynamic-field
-                                                    :static "static"}})]
+                                                    :static "static"}
+                                                   :write-key "write-key"})]
         (honeycomb/send client {:foo "bar"})
         (swap! dynamic-field inc)
         (honeycomb/send client {:foo "bar"}))
@@ -393,7 +415,36 @@
               {"dynamic" 2
                "foo" "bar"
                "static" "static"}]
-             (map event->fields @events))))))
+             (map event->fields @events)))))
+  (testing "Randomly generated send options"
+    (doseq [send-options (gen/sample (s/gen :clj-honeycomb.core/send-options))]
+      (validate-events
+       (fn []
+         (honeycomb/send {:foo "bar"} send-options))
+       (fn [events errors]
+         (if (empty? errors)
+           (do
+             (is (= 1 (count events)))
+             (is (= {"foo" "bar"} (event->fields (first events)))))
+           (do
+             (is (= 1 (count errors)))
+             (is (instance? ClientRejected (first errors)))
+             (is  (= "NOT_SAMPLED" (str (.getReason ^ClientRejected (first errors)))))))))))
+  (testing "Random everything"
+    (doseq [client-options (gen/sample (s/gen :clj-honeycomb.core/client-options))]
+      (doseq [send-options (gen/sample (s/gen :clj-honeycomb.core/send-options))]
+        (let [events (atom [])]
+          (with-open [client (recording-client events client-options)]
+            (honeycomb/send client {:foo "bar"} send-options))
+          (cond (= 0 (count @events))
+                (is (or (< 1 (or (:sample-rate client-options) 1))
+                        (< 1 (or (:sample-rate send-options) 1))))
+
+                (= 1 (count @events))
+                (is (contains? (event->fields (first @events)) "foo"))
+
+                :else
+                (is (empty? @events))))))))
 
 (defn- capture-honeycomb-http-calls
   [data-set expected-calls timeout-ms f]

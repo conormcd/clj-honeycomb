@@ -13,7 +13,7 @@
      (honeycomb/add-to-event :more \"event data\")
      ... do more of your stuff ...)"
   (:refer-clojure :exclude [send])
-  (:use clojure.future)
+  (:use [clojure.future])
   (:require [clojure.spec.alpha :as s]
 
             [clj-honeycomb.fields :as fields])
@@ -27,32 +27,47 @@
                                   TransportOptions)
            (clj_honeycomb Client)))
 
-(s/def ::api-host string?)
-(s/def ::batch-size int?)
-(s/def ::batch-timeout-millis int?)
-(s/def ::buffer-size int?)
-(s/def ::connect-timeout int?)
-(s/def ::connection-request-timeout int?)
-(s/def ::data-set string?)
-(s/def ::event-post-processor (partial instance? EventPostProcessor))
-(s/def ::event-pre-processor fn?)
+(def ^:private pos-java-int?
+  "Like pos-int? except within the range of numbers of java.lang.Integer."
+  (s/int-in 1 Integer/MAX_VALUE))
+
+(def ^:private response-observer-fn
+  "A spec for functions in the ResponseObserver."
+  (s/with-gen fn?
+    #(s/gen #{nil
+              (fn [_] nil)})))
+
+(s/def ::api-host (s/and string? seq))
+(s/def ::batch-size pos-java-int?)
+(s/def ::batch-timeout-millis pos-java-int?)
+(s/def ::buffer-size (s/int-in 1024 Integer/MAX_VALUE))
+(s/def ::connect-timeout pos-java-int?)
+(s/def ::connection-request-timeout pos-java-int?)
+(s/def ::data-set (s/and string? seq))
+(s/def ::event-post-processor (s/with-gen (partial instance? EventPostProcessor)
+                                #(s/gen #{(reify EventPostProcessor
+                                            (process [_this _event-data]
+                                              nil))})))
+(s/def ::event-pre-processor (s/with-gen fn?
+                               #(s/gen #{(fn [event-data options]
+                                           [event-data options])})))
 (s/def ::global-fields map?)
-(s/def ::io-thread-count int?)
-(s/def ::max-connections int?)
-(s/def ::max-connections-per-api-host int?)
-(s/def ::maximum-http-request-shutdown-wait int?)
-(s/def ::maximum-pending-batch-requests int?)
+(s/def ::io-thread-count (s/int-in 1 (.availableProcessors (Runtime/getRuntime))))
+(s/def ::max-connections pos-java-int?)
+(s/def ::max-connections-per-api-host pos-java-int?)
+(s/def ::maximum-http-request-shutdown-wait pos-int?)
+(s/def ::maximum-pending-batch-requests pos-java-int?)
 (s/def ::metadata map?)
-(s/def ::on-client-rejected fn?)
-(s/def ::on-server-accepted fn?)
-(s/def ::on-server-rejected fn?)
-(s/def ::on-unknown fn?)
+(s/def ::on-client-rejected response-observer-fn)
+(s/def ::on-server-accepted response-observer-fn)
+(s/def ::on-server-rejected response-observer-fn)
+(s/def ::on-unknown response-observer-fn)
 (s/def ::pre-sampled boolean?)
-(s/def ::queue-capacity int?)
-(s/def ::sample-rate int?)
-(s/def ::socket-timeout int?)
+(s/def ::queue-capacity pos-java-int?)
+(s/def ::sample-rate pos-java-int?)
+(s/def ::socket-timeout pos-java-int?)
 (s/def ::timestamp int?)
-(s/def ::write-key string?)
+(s/def ::write-key (s/and string? seq))
 (s/def ::response-observer
   (s/keys :opt-un [::on-client-rejected
                    ::on-server-accepted
@@ -102,7 +117,7 @@
            global-fields
            sample-rate
            write-key]}]
-  (let [[static-fields dynamic-fields] (fields/separate global-fields)]
+  (let [[static-fields dynamic-fields] (fields/separate (or global-fields {}))]
     (cond-> (LibHoney/options)
       api-host (.setApiHost (URI. api-host))
       data-set (.setDataset data-set)
@@ -395,6 +410,12 @@
 
 (def ^:private ^:dynamic *event-data* (atom {}))
 
+(s/fdef add-to-event
+  :args (s/alt :map (s/cat :map map?)
+               :k-v (s/cat :k any?
+                           :v any?))
+  :ret map?)
+
 (defn add-to-event
   "From within a with-event form, add further fields to the event which will
    be sent at the end of the with-event.
@@ -406,6 +427,12 @@
    (swap! *event-data* merge m))
   ([k v]
    (swap! *event-data* assoc k v)))
+
+(s/fdef with-event-fn
+  :args (s/cat :event-data map?
+               :options ::send-options
+               :f fn?)
+  :ret any?)
 
 (defn- with-event-fn
   "A function implementing with-event. See with-event for documentation."

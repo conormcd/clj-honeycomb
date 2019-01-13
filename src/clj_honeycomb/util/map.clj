@@ -3,9 +3,15 @@
    operations since it consumes seqs like doall. These map operations work on
    maps *only*."
   (:refer-clojure :exclude [flatten])
-  (:require [clojure.string :as str]
+  (:use [clojure.future])
+  (:require [clojure.spec.alpha :as s]
+            [clojure.string :as str]
 
             [clj-honeycomb.util.keyword :refer (stringify-keyword)]))
+
+(s/fdef stringify-keys
+  :args (s/cat :m map?)
+  :ret map?)
 
 (defn stringify-keys
   "Recursively walk a map and convert all keyword keys to strings. We can't
@@ -14,13 +20,23 @@
 
    m The map to transform."
   [m]
-  (if (map? m)
-    (->> m
-         (map (fn [[k v]]
-                [(stringify-keys (stringify-keyword k))
-                 (stringify-keys v)]))
-         (into {}))
-    m))
+  (when-not (map? m)
+    (throw (IllegalArgumentException. "The argument to stringify-keys must be a map.")))
+  (->> m
+       (map (fn [[k v]]
+              [(cond (map? k) (stringify-keys k)
+                     (keyword? k) (stringify-keyword k)
+                     :else (str k))
+               (if (map? v)
+                 (stringify-keys v)
+                 v)]))
+       (into {})))
+
+(s/fdef paths
+  :args (s/alt :without-prefix (s/cat :m map?)
+               :with-prefix (s/cat :prefix vector?
+                                   :m map?))
+  :ret (s/coll-of vector?))
 
 (defn paths
   "If a path is a vector that can be handed to get-in, assoc-in, etc, then
@@ -31,13 +47,19 @@
   ([m]
    (paths [] m))
   ([prefix m]
-   (if (map? m)
-     (mapcat (fn [[k v]]
-               (if (map? v)
-                 (paths (conj prefix k) v)
-                 [(conj prefix k)]))
-             m)
-     [])))
+   (when-not (map? m)
+     (throw (IllegalArgumentException. "The argument to paths must be a map.")))
+   (mapcat (fn [[k v]]
+             (if (map? v)
+               (paths (conj prefix k) v)
+               [(conj prefix k)]))
+           m)))
+
+(s/fdef flatten
+  :args (s/cat :f (s/fspec :args (s/cat :path vector?)
+                           :ret any?)
+               :m map?)
+  :ret map?)
 
 (defn flatten
   "Flatten an arbitrarily deep map into a flat map. Takes a function to
@@ -48,12 +70,19 @@
      map.
    m The map to flatten"
   [f m]
-  (if (map? m)
-    (->> (paths m)
-         (map (fn [path]
-                [(f path) (get-in m path)]))
-         (into {}))
-    m))
+  (when-not (fn? f)
+    (throw (IllegalArgumentException. "The first argument to flatten must be a function.")))
+  (when-not (map? m)
+    (throw (IllegalArgumentException. "The second argument to flatten must be a map.")))
+  (->> (paths m)
+       (map (fn [path]
+              [(f path) (get-in m path)]))
+       (into {})))
+
+(s/fdef flatten-and-stringify
+  :args (s/cat :prefix string?
+               :m map?)
+  :ret map?)
 
 (defn flatten-and-stringify
   "Flatten a map with flatten, and convert the path of keys to a dot-separated
@@ -62,9 +91,15 @@
    prefix A prefix for all keys in the output map.
    m      The map to flatten"
   [prefix m]
+  (when-not (string? prefix)
+    (throw (IllegalArgumentException. "The prefix must be a String")))
+  (when-not (map? m)
+    (throw (IllegalArgumentException. "The second argument to flatten-and-stringify must be a map.")))
   (flatten (fn [path]
              (->> path
-                  (map (comp str stringify-keyword))
+                  (map #(if (keyword? %)
+                          (stringify-keyword %)
+                          (str %)))
                   (str/join ".")
                   (str prefix)))
            m))
