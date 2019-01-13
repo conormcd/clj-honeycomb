@@ -46,7 +46,8 @@
              :long
              :nil
              :ratio
-             :string}
+             :string
+             :uuid}
            (->> m
                 (remove (comp (partial instance? ValueSupplier) val))
                 (map key)
