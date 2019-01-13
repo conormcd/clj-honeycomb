@@ -10,15 +10,25 @@
             [clj-honeycomb.core :as honeycomb]
             [clj-honeycomb.testing-utils :refer (recording-client validate-events)])
   (:import (clojure.lang ExceptionInfo)
-           (io.honeycomb.libhoney EventPostProcessor
+           (stub_http.core NanoFakeServer)
+           (io.honeycomb.libhoney Event
+                                  EventPostProcessor
                                   HoneyClient
                                   Options
+                                  ResponseObserver
                                   TransportOptions
                                   ValueSupplier)
            (io.honeycomb.libhoney.responses ClientRejected
                                             ServerAccepted
                                             ServerRejected
                                             Unknown)))
+
+(defn- event->fields
+  "A helper to extract the fields from an event while avoiding NPEs and ensuring
+   that we get a legit Clojure map out at the end."
+  [^Event event]
+  (when event
+    (into {} (.getFields event))))
 
 (deftest client-options-works
   (testing "It fails when it's missing both data-set and write-key"
@@ -125,7 +135,7 @@
                                    :queueCapacity 10000
                                    :socketTimeout 3000}
         checks-out (fn [expected input]
-                     (let [to (#'honeycomb/transport-options input)]
+                     (let [^TransportOptions to (#'honeycomb/transport-options input)]
                        (and (instance? TransportOptions to)
                             (integer? (.getIoThreadCount to))
                             (pos? (.getIoThreadCount to))
@@ -179,21 +189,21 @@
         server-rejected (reify ServerRejected)
         unknown (reify Unknown)]
     (testing "It still works OK if there are no actual handlers"
-      (let [ro (#'honeycomb/response-observer {})]
+      (let [^ResponseObserver ro (#'honeycomb/response-observer {})]
         (.onClientRejected ro client-rejected)
         (.onServerAccepted ro server-accepted)
         (.onServerRejected ro server-rejected)
         (.onUnknown ro unknown)))
     (testing "Each function works as expected"
-      (let [ro (#'honeycomb/response-observer
-                {:on-client-rejected (fn [cr]
-                                       (is (= cr client-rejected)))
-                 :on-server-accepted (fn [sa]
-                                       (is (= sa server-accepted)))
-                 :on-server-rejected (fn [sr]
-                                       (is (= sr server-rejected)))
-                 :on-unknown (fn [u]
-                               (is (= u unknown)))})]
+      (let [^ResponseObserver ro (#'honeycomb/response-observer
+                                  {:on-client-rejected (fn [cr]
+                                                         (is (= cr client-rejected)))
+                                   :on-server-accepted (fn [sa]
+                                                         (is (= sa server-accepted)))
+                                   :on-server-rejected (fn [sr]
+                                                         (is (= sr server-rejected)))
+                                   :on-unknown (fn [u]
+                                                 (is (= u unknown)))})]
         (.onClientRejected ro client-rejected)
         (.onServerAccepted ro server-accepted)
         (.onServerRejected ro server-rejected)
@@ -266,24 +276,24 @@
   (with-open [honeycomb-client (honeycomb/client {:data-set "data-set"
                                                   :write-key "write-key"})]
     (testing "Empty event"
-      (let [event (#'honeycomb/create-event honeycomb-client {} {})]
+      (let [^Event event (#'honeycomb/create-event honeycomb-client {} {})]
         (is (= "https://api.honeycomb.io/" (str (.getApiHost event))))
         (is (= "data-set" (.getDataset event)))
-        (is (= {} (.getFields event)))
+        (is (= {} (event->fields event)))
         (is (= {} (.getMetadata event)))
         (is (= 1 (.getSampleRate event)))
         (is (nil? (.getTimestamp event)))
         (is (= "write-key" (.getWriteKey event)))))
     (testing "Fields get realized properly and infinite/lazy things don't block."
-      (let [event (#'honeycomb/create-event honeycomb-client
-                                            {:nil nil
-                                             :string "string"
-                                             :integer 42
-                                             :float Math/E
-                                             :fraction 22/7
-                                             :atom (atom 3)
-                                             :delay (delay 4)}
-                                            {})]
+      (let [^Event event (#'honeycomb/create-event honeycomb-client
+                                                   {:nil nil
+                                                    :string "string"
+                                                    :integer 42
+                                                    :float Math/E
+                                                    :fraction 22/7
+                                                    :atom (atom 3)
+                                                    :delay (delay 4)}
+                                                   {})]
         (is (= "https://api.honeycomb.io/" (str (.getApiHost event))))
         (is (= "data-set" (.getDataset event)))
         (is (= {"nil" nil
@@ -293,23 +303,23 @@
                 "fraction" (float 22/7)
                 "atom" 3
                 "delay" 4}
-               (.getFields event)))
+               (event->fields event)))
         (is (= {} (.getMetadata event)))
         (is (= 1 (.getSampleRate event)))
         (is (nil? (.getTimestamp event)))
         (is (= "write-key" (.getWriteKey event)))))
     (testing "Options get set on the event"
-      (let [event (#'honeycomb/create-event honeycomb-client
-                                            {}
-                                            {:api-host "https://localhost:123/"
-                                             :data-set "foo"
-                                             :metadata {:event-id 42}
-                                             :sample-rate 3
-                                             :timestamp 123456
-                                             :write-key "bar"})]
+      (let [^Event event (#'honeycomb/create-event honeycomb-client
+                                                   {}
+                                                   {:api-host "https://localhost:123/"
+                                                    :data-set "foo"
+                                                    :metadata {:event-id 42}
+                                                    :sample-rate 3
+                                                    :timestamp 123456
+                                                    :write-key "bar"})]
         (is (= "https://localhost:123/" (str (.getApiHost event))))
         (is (= "foo" (.getDataset event)))
-        (is (= {} (.getFields event)))
+        (is (= {} (event->fields event)))
         (is (= {:event-id 42} (.getMetadata event)))
         (is (= 3 (.getSampleRate event)))
         (is (= 123456 (.getTimestamp event)))
@@ -319,15 +329,15 @@
                                             :event-pre-processor (fn [event-data options]
                                                                    [(assoc event-data :integer 1) options])
                                             :write-key "write-key"})]
-        (let [event (#'honeycomb/create-event client
-                                              {:nil nil
-                                               :string "string"
-                                               :integer 42
-                                               :float Math/E
-                                               :fraction 22/7
-                                               :atom (atom 3)
-                                               :delay (delay 4)}
-                                              {})]
+        (let [^Event event (#'honeycomb/create-event client
+                                                     {:nil nil
+                                                      :string "string"
+                                                      :integer 42
+                                                      :float Math/E
+                                                      :fraction 22/7
+                                                      :atom (atom 3)
+                                                      :delay (delay 4)}
+                                                     {})]
           (is (= "https://api.honeycomb.io/" (str (.getApiHost event))))
           (is (= "data-set" (.getDataset event)))
           (is (= {"nil" nil
@@ -337,7 +347,7 @@
                   "fraction" (float 22/7)
                   "atom" 3
                   "delay" 4}
-                 (.getFields event)))
+                 (event->fields event)))
           (is (= {} (.getMetadata event)))
           (is (= 1 (.getSampleRate event)))
           (is (nil? (.getTimestamp event)))
@@ -355,19 +365,19 @@
        (fn [events errors]
          (is (empty? errors))
          (is (= 1 (count events)))
-         (is (= {"foo" "bar"} (.getFields (first events))))))))
+         (is (= {"foo" "bar"} (event->fields (first events))))))))
   (testing "Two arguments works"
     (let [events (atom [])]
       (with-open [client (recording-client events {})]
         (honeycomb/send client {:foo "bar"}))
       (is (= 1 (count @events)))
-      (is (= {"foo" "bar"} (.getFields (first @events))))))
+      (is (= {"foo" "bar"} (event->fields (first @events))))))
   (testing "Three arguments works"
     (let [events (atom [])]
       (with-open [client (recording-client events {})]
         (honeycomb/send client {:foo "bar"} {:pre-sampled true}))
       (is (= 1 (count @events)))
-      (is (= {"foo" "bar"} (.getFields (first @events))))))
+      (is (= {"foo" "bar"} (event->fields (first @events))))))
   (testing "Global fields get sent"
     (let [dynamic-field (atom 1)
           events (atom [])]
@@ -383,13 +393,13 @@
               {"dynamic" 2
                "foo" "bar"
                "static" "static"}]
-             (map #(into {} (.getFields %)) @events))))))
+             (map event->fields @events))))))
 
 (defn- capture-honeycomb-http-calls
   [data-set expected-calls timeout-ms f]
-  (with-open [http-server (stub-http/start! {(str "/1/batch/" data-set)
-                                             {:status 200
-                                              :body ""}})]
+  (with-open [^NanoFakeServer http-server (stub-http/start! {(str "/1/batch/" data-set)
+                                                             {:status 200
+                                                              :body ""}})]
     (f (:uri http-server))
     (let [deadline (+ (System/nanoTime) (* timeout-ms 1e6))]
       (loop []
@@ -489,7 +499,7 @@
      (fn [events errors]
        (is (empty? errors))
        (is (= 1 (count events)))
-       (let [event-data (some->> events first (.getFields) (into {}))]
+       (let [event-data (some->> events first event->fields)]
          (is (= {"foo" "foo"
                  "bar" "bar"
                  "baz" "baz"}
@@ -506,7 +516,7 @@
      (fn [events errors]
        (is (empty? errors))
        (is (= 1 (count events)))
-       (let [event-data (some->> events first (.getFields) (into {}))]
+       (let [event-data (some->> events first event->fields)]
          (is (= {"foo" "foo"
                  "bar" "bar"
                  "baz" "baz"}

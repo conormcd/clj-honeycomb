@@ -10,11 +10,11 @@
   (testing "Simple no-arg function"
     (let [v (fields/->ValueSupplier (constantly 42))]
       (is (instance? ValueSupplier v))
-      (is (= 42 (.supply v)))))
+      (is (= 42 (.supply ^ValueSupplier v)))))
   (testing "Function with args"
     (let [v (fields/->ValueSupplier inc 1)]
       (is (instance? ValueSupplier v))
-      (is (= 2 (.supply v))))))
+      (is (= 2 (.supply ^ValueSupplier v))))))
 
 (deftest realize-value-works
   (testing "Testing the kitchen sink"
