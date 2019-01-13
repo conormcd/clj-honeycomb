@@ -3,6 +3,7 @@
   (:require [clj-honeycomb.core :as honeycomb])
   (:import (clojure.lang Atom)
            (io.honeycomb.libhoney HoneyClient
+                                  Options
                                   ResponseObserver)
            (io.honeycomb.libhoney.responses ResponseObservable)
            (io.honeycomb.libhoney.transport Transport)
@@ -34,16 +35,16 @@
                       true))
         ro (when (:response-observer client-options)
              (#'honeycomb/response-observer (:response-observer client-options)))
-        client-options (#'honeycomb/client-options
-                        (merge {:data-set "data-set"
-                                :write-key "write-key"}
-                               client-options))
+        ^Options client-options (#'honeycomb/client-options
+                                 (merge {:data-set "data-set"
+                                         :write-key "write-key"}
+                                        client-options))
         client (Client. client-options transport)]
     (when ro
       (.addResponseObserver client ro))
     client))
 
-(defn no-op-client
+(defn ^Client no-op-client
   "Create a HoneyClient that drops every event on the floor. Useful both for
    testing and possibly also for production code that needs a valid client but
    wants to disable event sending for some reason.
@@ -55,7 +56,7 @@
   [client-options]
   (dummy-client client-options (fn [_event] nil)))
 
-(defn recording-client
+(defn ^Client recording-client
   "Create a HoneyClient which records all events sent by conj'ing them onto the
    atom-wrapped vector supplied.
 
@@ -125,7 +126,7 @@
    (let [events (atom [])
          errors (atom [])]
      (try
-       (with-open [client (recording-client events client-options)]
+       (with-open [^Client client (recording-client events client-options)]
          (.addResponseObserver client (recording-response-observer errors))
          (binding [honeycomb/*client* client]
            (fn-that-sends-events)))

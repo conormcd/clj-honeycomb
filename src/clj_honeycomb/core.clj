@@ -18,7 +18,8 @@
 
             [clj-honeycomb.fields :as fields])
   (:import (java.net URI)
-           (io.honeycomb.libhoney EventPostProcessor
+           (io.honeycomb.libhoney Event
+                                  EventPostProcessor
                                   HoneyClient
                                   LibHoney
                                   Options
@@ -174,7 +175,7 @@
   :args (s/cat :options ::client-options)
   :ret (partial instance? HoneyClient))
 
-(defn client
+(defn ^HoneyClient client
   "Construct a HoneyClient from a map of options. It is your responsibility to
    call .close on this object when you're finished with it. Failure to do so may
    result in a loss of events. It is recommended that you create this client
@@ -238,8 +239,8 @@
                          :socket-timeout
    :write-key            Your Honeycomb API key. (String. Required.)"
   [options]
-  (let [co (client-options options)
-        to (some-> (:transport-options options) transport-options)
+  (let [^Options co (client-options options)
+        ^TransportOptions to (some-> (:transport-options options) transport-options)
         client (if to
                  (Client. co to)
                  (Client. co))]
@@ -264,16 +265,16 @@
    client-or-options  Either an instance of HoneyClient or a map to pass to
                       client to create one."
   [client-or-options]
-  (let [client (cond (instance? HoneyClient client-or-options)
-                     client-or-options
+  (let [^HoneyClient client (cond (instance? HoneyClient client-or-options)
+                                  client-or-options
 
-                     (map? client-or-options)
-                     (client client-or-options)
+                                  (map? client-or-options)
+                                  (client client-or-options)
 
-                     :else
-                     (throw
-                      (IllegalArgumentException.
-                       "client-or-options must be a HoneyClient or a map.")))]
+                                  :else
+                                  (throw
+                                   (IllegalArgumentException.
+                                    "client-or-options must be a HoneyClient or a map.")))]
     (.closeOnShutdown client)
     (alter-var-root #'*client* (constantly client))
     client))
@@ -290,7 +291,7 @@
 (defn- honeycomb-client->event-pre-processor
   [hc]
   (when (instance? Client hc)
-    (.getEventPreProcessor hc)))
+    (.getEventPreProcessor ^Client hc)))
 
 (s/fdef create-event
   :args (s/cat :honeycomb-client (partial instance? HoneyClient)
@@ -300,11 +301,12 @@
                                          ::metadata
                                          ::sample-rate
                                          ::timestamp
-                                         ::write-key])))
+                                         ::write-key]))
+  :ret (partial instance? Event))
 
 (defn- create-event
   "Create a Honeycomb event object."
-  [honeycomb-client event-data event-options]
+  [^HoneyClient honeycomb-client event-data event-options]
   (let [[event-data {:keys [api-host
                             data-set
                             metadata
@@ -314,14 +316,22 @@
         (if-let [epp (honeycomb-client->event-pre-processor honeycomb-client)]
           (epp event-data event-options)
           [event-data event-options])]
-    (cond-> (.createEvent honeycomb-client)
-      api-host (.setApiHost (URI. api-host))
-      data-set (.setDataset data-set)
-      (not-empty event-data) (.addFields (fields/realize event-data))
-      (not-empty metadata) (.addMetadata metadata)
-      sample-rate (.setSampleRate sample-rate)
-      timestamp (.setTimestamp timestamp)
-      write-key (.setWriteKey write-key))))
+    (let [^Event event (.createEvent honeycomb-client)]
+      (when api-host
+        (.setApiHost event (URI. api-host)))
+      (when data-set
+        (.setDataset event data-set))
+      (when (seq event-data)
+        (.addFields event (fields/realize event-data)))
+      (when (seq metadata)
+        (.addMetadata event metadata))
+      (when sample-rate
+        (.setSampleRate event ^Long sample-rate))
+      (when timestamp
+        (.setTimestamp event timestamp))
+      (when write-key
+        (.setWriteKey event write-key))
+      event)))
 
 (s/fdef send
   :args (s/alt :implicit-no-options (s/cat :event-data map?)
@@ -378,7 +388,7 @@
             (concat [*client*] args))]
       (when (nil? honeycomb-client)
         (throw (IllegalStateException. "Either call init or pass a valid HoneyClient as the first argument.")))
-      (let [event (create-event honeycomb-client event-data (or options {}))]
+      (let [^Event event (create-event honeycomb-client event-data (or options {}))]
         (if pre-sampled
           (.sendPresampled event)
           (.send event))))))

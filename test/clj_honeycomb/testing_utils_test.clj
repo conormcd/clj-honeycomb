@@ -5,7 +5,9 @@
 
             [clj-honeycomb.core :as honeycomb]
             [clj-honeycomb.testing-utils :as tu])
-  (:import (io.honeycomb.libhoney HoneyClient)
+  (:import (io.honeycomb.libhoney Event
+                                  HoneyClient
+                                  ResponseObserver)
            (io.honeycomb.libhoney.responses ClientRejected
                                             ServerAccepted
                                             ServerRejected
@@ -39,7 +41,7 @@
         (honeycomb/send client {:foo "bar"}))
       (is (= 1 (count @events)))
       (let [expected (assoc kitchen-sink-realized "foo" "bar")
-            event (->> @events first (.getFields) (into {}))]
+            event (into {} (.getFields ^Event (first @events)))]
         (is (= (sort (keys expected)) (sort (keys event))))
         (doseq [[k v] expected]
           (is (= v (get event k)) k)))))
@@ -54,7 +56,7 @@
           sr (reify ServerRejected)
           u (reify Unknown)
           errors (atom [])
-          rro (#'tu/recording-response-observer errors)]
+          ^ResponseObserver rro (#'tu/recording-response-observer errors)]
       (.onClientRejected rro cr)
       (.onServerAccepted rro sa)
       (.onServerRejected rro sr)
@@ -73,4 +75,4 @@
    (fn [events errors]
      (is (empty? errors))
      (is (= 1 (count events)))
-     (is (= kitchen-sink-realized (.getFields (first events)))))))
+     (is (= kitchen-sink-realized (.getFields ^Event (first events)))))))

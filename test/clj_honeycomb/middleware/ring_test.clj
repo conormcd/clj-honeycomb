@@ -8,7 +8,8 @@
 
             [clj-honeycomb.fields :as fields]
             [clj-honeycomb.middleware.ring :as middle]
-            [clj-honeycomb.testing-utils :refer (validate-events)]))
+            [clj-honeycomb.testing-utils :refer (validate-events)])
+  (:import (io.honeycomb.libhoney Event)))
 
 (deftest default-extract-request-fields-works
   (are [input expected]
@@ -49,7 +50,7 @@
        (fn [events errors]
          (is (empty? errors))
          (is (= 1 (count events)))
-         (let [event (some->> events first (.getFields) (into {}))]
+         (let [event (some->> events first (#(.getFields ^Event %)) (into {}))]
            (is (float? (get event "elapsed-ms")))
            (is (= (->> (merge sample-ring-request-extracted
                               sample-ring-response-extracted)
@@ -63,7 +64,7 @@
        (fn [events errors]
          (is (empty? errors))
          (is (= 1 (count events)))
-         (let [event (some->> events first (.getFields) (into {}))]
+         (let [event (some->> events first (#(.getFields ^Event %)) (into {}))]
            (is (float? (get event "elapsed-ms")))
            (is (= (->> (merge sample-ring-request-extracted
                               {:exception sample-exception})
@@ -84,7 +85,7 @@
        (fn [events errors]
          (is (empty? errors))
          (is (= 1 (count events)))
-         (when-let [event (first events)]
+         (when-let [^Event event (first events)]
            (is (= "another" (.getDataset event)))
            (let [fields (into {} (.getFields event))]
              (is (float? (get fields "elapsed-ms")))
@@ -105,7 +106,7 @@
        (fn [events errors]
          (is (empty? errors))
          (is (= 1 (count events)))
-         (when-let [event (first events)]
+         (when-let [^Event event (first events)]
            (is (= {"ring.request.headers.host" "localhost"
                    "ring.request.protocol" "HTTP/1.1"
                    "ring.request.query-string" "bar=bar&baz=baz"
@@ -132,7 +133,7 @@
        (fn [events errors]
          (is (empty? errors))
          (is (= 1 (count events)))
-         (when-let [event (first events)]
+         (when-let [^Event event (first events)]
            (is (= {"ring.request.headers.host" "localhost"
                    "ring.request.protocol" "HTTP/1.1"
                    "ring.request.query-string" "bar=bar&baz=baz"
