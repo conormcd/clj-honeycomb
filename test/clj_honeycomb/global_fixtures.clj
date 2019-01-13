@@ -2,7 +2,8 @@
   "A combination of functions that must get called once and early during
    testing and some global testing data."
   (:require [clojure.spec.test.alpha :as stest]
-            [ring.mock.request :as mock-request]))
+            [ring.mock.request :as mock-request])
+  (:import (java.util UUID)))
 
 ;; Functions which we want called once and early during testing.
 (set! *warn-on-reflection* true)
@@ -49,6 +50,8 @@
 
 (def ^:private exception (Exception. "An exception"))
 
+(def ^:private uuid (UUID/randomUUID))
+
 (defn make-kitchen-sink
   []
   (let [a (agent 0)
@@ -80,6 +83,7 @@
          :repeat (repeat 1)
          :set #{"foo" "bar"}
          :string "string"
+         :uuid uuid
          :vector [1 2 3 4 5]
          :volatile (volatile! 3)}
         ((fn [x]
@@ -108,6 +112,7 @@
        "repeat" (take 1000 (repeat 1))
        "set" (vec #{"foo" "bar"})
        "string" "string"
+       "uuid" (str uuid)
        "vector" [1 2 3 4 5]
        "volatile" 3}
       ((fn [x]

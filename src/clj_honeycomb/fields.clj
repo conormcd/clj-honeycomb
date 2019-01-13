@@ -9,7 +9,8 @@
    Only the ->ValueSupplier function in this namespace should be considered part
    of the public API for clj-honeycomb."
   (:require [clj-honeycomb.util.map :as util-map])
-  (:import (clojure.lang IBlockingDeref
+  (:import (java.util UUID)
+           (clojure.lang IBlockingDeref
                          IDeref
                          IPending
                          Repeat)
@@ -28,6 +29,7 @@
   [v]
   (cond (keyword? v) (str v)
         (ratio? v) (float v)
+        (instance? UUID v) (str v)
         :else v))
 
 (defn- realize-value
