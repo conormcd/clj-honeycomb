@@ -1,6 +1,9 @@
 (ns clj-honeycomb.testing-utils-test
   (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
 
+            [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
+            [clojure.spec.test.alpha :refer (with-instrument-disabled)]
             [clojure.test :refer (deftest is testing)]
 
             [clj-honeycomb.core :as honeycomb]
@@ -15,14 +18,21 @@
 
 (deftest no-op-client-works
   (testing "Default options work"
-    (is (instance? HoneyClient (tu/no-op-client {}))))
+    (is (instance? HoneyClient (tu/no-op-client {:data-set "data-set"
+                                                 :write-key "write-key"}))))
   (testing "Sending events works"
-    (with-open [client (tu/no-op-client {})]
-      (honeycomb/send client {:foo "bar"}))))
+    (with-open [client (tu/no-op-client {:data-set "data-set"
+                                         :write-key "write-key"})]
+      (honeycomb/send client {:foo "bar"})))
+  (testing "Random options work"
+    (doseq [client-options (gen/sample (s/gen :clj-honeycomb.core/client-options))]
+      (with-open [client (tu/no-op-client client-options)]
+        (honeycomb/send client {:foo "bar"})))))
 
 (deftest recording-client-works
   (testing "Default options work"
-    (is (instance? HoneyClient (tu/recording-client (atom []) {}))))
+    (is (instance? HoneyClient (tu/recording-client (atom []) {:data-set "data-set"
+                                                               :write-key "write-key"}))))
   (testing "Additional client options can be set"
     (with-open [client (tu/recording-client (atom [])
                                             {:api-host "http://127.0.0.1:123"
@@ -31,6 +41,10 @@
                                              :sample-rate 3
                                              :write-key "bar"})]
       (is (instance? HoneyClient client))))
+  (testing "Randomly generated options"
+    (doseq [client-options (gen/sample (s/gen :clj-honeycomb.core/client-options))]
+      (with-open [client (tu/recording-client (atom []) client-options)]
+        (is (instance? HoneyClient client)))))
   (testing "Global fields work"
     (let [events (atom [])]
       (with-open [client (tu/recording-client events
@@ -46,8 +60,9 @@
         (doseq [[k v] expected]
           (is (= v (get event k)) k)))))
   (testing "The first argument must be an atom-wrapped vector"
-    (is (thrown? IllegalArgumentException (tu/recording-client nil {})))
-    (is (thrown? IllegalArgumentException (tu/recording-client (atom nil) {})))))
+    (with-instrument-disabled
+      (is (thrown? IllegalArgumentException (tu/recording-client nil {})))
+      (is (thrown? IllegalArgumentException (tu/recording-client (atom nil) {}))))))
 
 (deftest recording-response-observer-works
   (testing "It records only the errors"
@@ -63,10 +78,11 @@
       (.onUnknown rro u)
       (is (= [cr sr u] @errors))))
   (testing "The first argument must be an atom-wrapped vector"
-    (try
-      (#'tu/recording-response-observer nil)
-      (catch IllegalArgumentException e
-        (is e)))))
+    (with-instrument-disabled
+      (try
+        (#'tu/recording-response-observer nil)
+        (catch IllegalArgumentException e
+          (is e))))))
 
 (deftest validate-events-works
   (tu/validate-events

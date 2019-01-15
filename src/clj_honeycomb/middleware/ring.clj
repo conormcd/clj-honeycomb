@@ -1,7 +1,14 @@
 (ns clj-honeycomb.middleware.ring
   "Ring middleware to turn every request/response into a Honeycomb event."
-  (:require [clj-honeycomb.core :as honeycomb]
+  (:use [clojure.future])
+  (:require [clojure.spec.alpha :as s]
+
+            [clj-honeycomb.core :as honeycomb]
             [clj-honeycomb.util.map :as map-util]))
+
+(s/fdef default-extract-request-fields
+  :args (s/cat :request map?)
+  :ret map?)
 
 (defn- default-extract-request-fields
   "Convert a Ring request into a map of fields to be added to the event.
@@ -10,14 +17,42 @@
   [request]
   (map-util/flatten-and-stringify "ring.request." (dissoc request :body)))
 
+(s/fdef default-extract-response-fields
+  :args (s/cat :response map?)
+  :ret map?)
+
 (defn- default-extract-response-fields
   "Convert a Ring response into a map of fields to be added to the event.
 
    response  The Ring response map."
   [response]
   (map-util/flatten-and-stringify "ring.response."
-                                  (some-> response
-                                          (select-keys [:headers :status]))))
+                                  (select-keys response [:headers :status])))
+
+(s/def ::extract-request-fields (s/with-gen (s/fspec :args (s/cat :request map?)
+                                                     :ret map?)
+                                  #(s/gen #{(fn [_map] {})
+                                            default-extract-request-fields})))
+(s/def ::extract-response-fields (s/with-gen (s/fspec :args (s/cat :response map?)
+                                                      :ret map?)
+                                   #(s/gen #{(fn [_map] {})
+                                             default-extract-response-fields})))
+(s/def ::honeycomb-event-data (s/and map? seq))
+(s/def ::honeycomb-event-options :clj-honeycomb.core/send-options)
+(s/def ::with-honeycomb-event-options (s/keys :opt-un [::extract-request-fields
+                                                       ::extract-response-fields
+                                                       ::honeycomb-event-data
+                                                       ::honeycomb-event-options]))
+(s/fdef with-honeycomb-event
+  :args (s/alt :without-options (s/cat :handler fn?)
+               :with-options (s/cat :options ::with-honeycomb-event-options
+                                    :handler fn?))
+  :ret (s/alt :sync (s/fspec :args (s/cat :request map?)
+                             :ret map?)
+              :async (s/fspec :args (s/cat :request map?
+                                           :respond fn?
+                                           :raise fn?)
+                              :ret any?)))
 
 (defn with-honeycomb-event
   "Ring middleware to turn every request/response into a Honeycomb event. By

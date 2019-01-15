@@ -4,6 +4,8 @@
                                                    sample-ring-response
                                                    sample-ring-response-extracted)]
 
+            [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
             [clojure.test :refer (are deftest is testing)]
 
             [clj-honeycomb.fields :as fields]
@@ -12,20 +14,32 @@
   (:import (io.honeycomb.libhoney Event)))
 
 (deftest default-extract-request-fields-works
-  (are [input expected]
-       (= expected (#'middle/default-extract-request-fields input))
+  (testing "Known values"
+    (are [input expected]
+         (= expected (#'middle/default-extract-request-fields input))
 
-    nil nil
-    {} {}
-    sample-ring-request sample-ring-request-extracted))
+      {} {}
+      sample-ring-request sample-ring-request-extracted))
+  (testing "Randomly generated data"
+    (doseq [request (gen/sample (s/gen map?))]
+      (let [fields (#'middle/default-extract-request-fields request)]
+        (is (map? fields))
+        (is (every? string? (keys fields)))
+        (is (every? (complement map?) (vals fields)))))))
 
 (deftest default-extract-response-fields-works
-  (are [input expected]
-       (= expected (#'middle/default-extract-response-fields input))
+  (testing "Known values"
+    (are [input expected]
+         (= expected (#'middle/default-extract-response-fields input))
 
-    nil nil
-    {} {}
-    sample-ring-response sample-ring-response-extracted))
+      {} {}
+      sample-ring-response sample-ring-response-extracted))
+  (testing "Randomly generated data"
+    (doseq [response (gen/sample (s/gen map?))]
+      (let [fields (#'middle/default-extract-response-fields response)]
+        (is (map? fields))
+        (is (every? string? (keys fields)))
+        (is (every? (complement map?) (vals fields)))))))
 
 (deftest with-honeycomb-event-works
   (let [happy-handler (fn
@@ -50,7 +64,7 @@
        (fn [events errors]
          (is (empty? errors))
          (is (= 1 (count events)))
-         (let [event (some->> events first (#(.getFields ^Event %)) (into {}))]
+         (let [event (some->> events seq first (#(.getFields ^Event %)) (into {}))]
            (is (float? (get event "elapsed-ms")))
            (is (= (->> (merge sample-ring-request-extracted
                               sample-ring-response-extracted)
@@ -144,4 +158,19 @@
                    "ring.request.server-port" 80
                    "ring.request.uri" "/foo"
                    "exception" sample-exception}
-                  (dissoc (into {} (.getFields event)) "elapsed-ms")))))))))
+                  (dissoc (into {} (.getFields event)) "elapsed-ms")))))))
+    (testing "Randomly generated input (happy path)"
+      (doseq [options (gen/sample (s/gen :clj-honeycomb.middleware.ring/with-honeycomb-event-options))]
+        (validate-events
+         (fn []
+           ((middle/with-honeycomb-event options happy-handler)
+            sample-ring-request))
+         (fn [events errors]
+           (if (empty? errors)
+             (do
+               (is (empty? errors))
+               (is (= 1 (count events))))
+             (do
+               (is (empty? events))
+               (is (= 1 (count errors)))
+               (is (< 1 (:sample-rate (:honeycomb-event-options options))))))))))))
