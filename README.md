@@ -58,7 +58,7 @@ the body.
 ; {"foo" "foo"
 ;  "bar" "bar"
 ;  "baz" "baz"
-;  "elapsed-ms" 1234.567}
+;  "durationMs" 1234.567}
 ```
 
 ### Global and dynamic fields
@@ -172,7 +172,7 @@ of the request and response data but adds some static and dynamic fields.
                                        {:status (:status res)})}))
 
 ; This will produce events that look like this:
-; {"elapsed-ms" 83.932
+; {"durationMs" 83.932
 ;  "num-headers" 12
 ;  "num-thingers" 3
 ;  "static-field" "sent with every event"

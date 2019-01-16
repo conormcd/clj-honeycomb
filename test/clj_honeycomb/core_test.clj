@@ -556,8 +556,8 @@
          (is (= {"foo" "foo"
                  "bar" "bar"
                  "baz" "baz"}
-                (dissoc event-data "elapsed-ms")))
-         (is (< 100 (get event-data "elapsed-ms" -1)))))))
+                (dissoc event-data "durationMs")))
+         (is (< 100 (get event-data "durationMs" -1)))))))
   (testing "Code that throws both throws AND sends the event"
     (validate-events
      (fn []
@@ -573,8 +573,8 @@
          (is (= {"foo" "foo"
                  "bar" "bar"
                  "baz" "baz"}
-                (dissoc event-data "exception" "elapsed-ms")))
-         (is (some-> (get event-data "elapsed-ms") pos?))
+                (dissoc event-data "exception" "durationMs")))
+         (is (some-> (get event-data "durationMs") pos?))
          (is (instance? Exception (get event-data "exception"))))))))
 
 (deftest live-test-against-honeycomb

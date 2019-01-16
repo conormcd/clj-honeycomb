@@ -60,11 +60,11 @@
          (is (empty? errors))
          (is (= 1 (count events)))
          (let [event (some->> events seq first (#(.getFields ^Event %)) (into {}))]
-           (is (float? (get event "elapsed-ms")))
+           (is (float? (get event "durationMs")))
            (is (= (->> (merge sample-ring-request-extracted
                               sample-ring-response-extracted)
                        fields/realize)
-                  (dissoc event "elapsed-ms")))))))
+                  (dissoc event "durationMs")))))))
     (testing "Default options (sad path)"
       (validate-events
        (fn []
@@ -74,11 +74,11 @@
          (is (empty? errors))
          (is (= 1 (count events)))
          (let [event (some->> events first (#(.getFields ^Event %)) (into {}))]
-           (is (float? (get event "elapsed-ms")))
+           (is (float? (get event "durationMs")))
            (is (= (->> (merge sample-ring-request-extracted
                               {:exception sample-exception})
                        fields/realize)
-                  (dissoc event "elapsed-ms")))))))
+                  (dissoc event "durationMs")))))))
     (testing "Try out all the options"
       (validate-events
        (fn []
@@ -97,11 +97,11 @@
          (when-let [^Event event (first events)]
            (is (= "another" (.getDataset event)))
            (let [fields (into {} (.getFields event))]
-             (is (float? (get fields "elapsed-ms")))
+             (is (float? (get fields "durationMs")))
              (is (= {"fixed" "field"
                      "method" ":get"
                      "status" 200}
-                    (dissoc fields "elapsed-ms"))))))))
+                    (dissoc fields "durationMs"))))))))
     (testing "Async handler (happy path)"
       (validate-events
        (fn []
@@ -128,7 +128,7 @@
                    "ring.response.headers.Content-Type" "text/plain"
                    "ring.response.headers.some-other-header" ":ring-is-funny"
                    "ring.response.status" 200}
-                  (dissoc (into {} (.getFields event)) "elapsed-ms")))))))
+                  (dissoc (into {} (.getFields event)) "durationMs")))))))
     (testing "Async handler (sad path)"
       (validate-events
        (fn []
@@ -153,7 +153,7 @@
                    "ring.request.server-port" 80
                    "ring.request.uri" "/foo"
                    "exception" sample-exception}
-                  (dissoc (into {} (.getFields event)) "elapsed-ms")))))))
+                  (dissoc (into {} (.getFields event)) "durationMs")))))))
     (testing "Randomly generated input (happy path)"
       (doseq [options (gen/sample (s/gen :clj-honeycomb.middleware.ring/with-honeycomb-event-options))]
         (validate-events

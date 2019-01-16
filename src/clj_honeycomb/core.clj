@@ -450,7 +450,7 @@
           (add-to-event :exception t)
           (throw t))
         (finally
-          (add-to-event :elapsed-ms (/ (- (System/nanoTime) start) 1e6))
+          (add-to-event :durationMs (/ (- (System/nanoTime) start) 1e6))
           (send *client* @*event-data* options))))))
 
 (defmacro with-event
@@ -460,7 +460,7 @@
                     top of the global fields configured in the HoneyClient. The
                     following additional keys will be added to the event data
                     just before sending:
-                    :elapsed-ms   The number of milliseconds it took to execute
+                    :durationMs   The number of milliseconds it took to execute
                                   the body of this macro.
                     :exception    If an exception was thrown, it will be added
                                   to this field before being rethrown.
