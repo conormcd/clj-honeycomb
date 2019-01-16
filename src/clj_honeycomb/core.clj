@@ -443,7 +443,8 @@
   "A function implementing with-event. See with-event for documentation."
   [event-data options f]
   (binding [*event-data* (atom event-data)]
-    (let [start (System/nanoTime)]
+    (let [options (merge {:timestamp (System/currentTimeMillis)} options)
+          start (System/nanoTime)]
       (try
         (f)
         (catch Throwable t
