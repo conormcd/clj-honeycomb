@@ -18,6 +18,7 @@
 
             [clj-honeycomb.fields :as fields])
   (:import (java.net URI)
+           (java.util UUID)
            (io.honeycomb.libhoney Event
                                   EventPostProcessor
                                   HoneyClient
@@ -433,11 +434,33 @@
   ([k v]
    (swap! *event-data* assoc k v)))
 
+(s/fdef generate-trace-id
+  :args (s/cat)
+  :ret string?)
+
+(defn ^:no-doc generate-trace-id
+  "Generate a unique trace ID."
+  []
+  (str (UUID/randomUUID)))
+
+(s/fdef generate-span-id
+  :args (s/cat)
+  :ret string?)
+
+(defn ^:no-doc generate-span-id
+  "Generate a unique tracing span ID."
+  []
+  (str (UUID/randomUUID)))
+
 (s/fdef with-event-fn
   :args (s/cat :event-data map?
                :options ::send-options
                :f fn?)
   :ret any?)
+
+(def ^:private ^:dynamic *parent-span-id* nil)
+
+(def ^:private ^:dynamic *parent-trace-id* nil)
 
 (defn- with-event-fn
   "A function implementing with-event. See with-event for documentation."
@@ -446,7 +469,15 @@
     (let [options (merge {:timestamp (System/currentTimeMillis)} options)
           start (System/nanoTime)]
       (try
-        (f)
+        (if-let [trace-id (or (:traceId event-data) *parent-trace-id*)]
+          (let [span-id (or (:id event-data) (generate-span-id))]
+            (add-to-event {:id span-id
+                           :parentId (or (:parentId event-data) *parent-span-id*)
+                           :traceId trace-id})
+            (binding [*parent-trace-id* trace-id
+                      *parent-span-id* span-id]
+              (f)))
+          (f))
         (catch Throwable t
           (add-to-event :exception t)
           (throw t))
@@ -494,3 +525,12 @@
                                   (String. Optional.)"
   [event-data options & body]
   `(#'with-event-fn ~event-data ~options (fn [] ~@body)))
+
+(defmacro with-trace-id
+  "Wrap some code and associate it all with a single trace ID.
+
+   trace-id The ID to be associated as `:traceId` with every event within this
+            body (unless overridden)."
+  [trace-id & body]
+  `(binding [*parent-trace-id* ~trace-id]
+     ~@body))

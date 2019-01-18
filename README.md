@@ -10,6 +10,7 @@ wrapping [libhoney-java 1.0.6](https://github.com/honeycombio/libhoney-java).
 - [Usage](#usage)
   - [Global and dynamic fields](#global-and-dynamic-fields)
   - [Sampling](#sampling)
+  - [Tracing](#tracing)
   - [Pre- and Post-processing events](#pre--and-post-processing-events)
   - [Middleware](#middleware)
   - [Monitoring](#monitoring)
@@ -141,6 +142,149 @@ method on that object will be called with a single, mutable
 object. This is called after sampling has taken place, so it will only be run
 on events which will be sent to Honeycomb.io. See the documentation for the
 EventPostProcessor class to understand the constraints on modifying the event.
+
+### Tracing
+
+TL;DR: Wrap something with `with-event` and make sure it includes `:traceId`
+in the event data in order to create tracing spans.
+
+Honeycomb provides powerful tracing capabilities and this library attempts to
+create tracing spans from every use of `with-event`. The following event data
+fields control the creation of spans:
+
+<table>
+  <tr>
+    <th>Field</th>
+    <th>Required?</th>
+    <th>Default</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td><code>:traceId</code></td>
+    <td>Yes</td>
+    <td></td>
+    <td>The ID of the trace this belongs to. This is the ID that will tie
+      multiple spans together.</td>
+  </tr>
+  <tr>
+    <td><code>:id</code></td>
+    <td>No</td>
+    <td><code>(honeycomb/generate-span-id)</code></td>
+    <td>A unique ID for the span. If not provided, one will be randomly
+      generated for you and added to the event if (and only if) a
+      <code>traceId</code> has been added to the event before.</td>
+  </tr>
+  <tr>
+    <td><code>:durationMs</code></td>
+    <td>Yes</td>
+    <td>Automatically calculated by <code>with-event</code>.</td>
+    <td>The duration of the span, in milliseconds.</td>
+  </tr>
+  <tr>
+    <td><code>:name</code></td>
+    <td>No</td>
+    <td></td>
+    <td>The name of the function/method/API handler generating the event. This
+      can be blank.</td>
+  </tr>
+  <tr>
+    <td><code>:parentId</code></td>
+    <td>No</td>
+    <td></td>
+    <td>The ID of this span's parent span. This is set automatically for you
+      if you nest calls to <code>with-event</code>. You can set this manually
+      if you need to "waterfall" spans which don't enclose each other.</td>
+  </tr>
+  <tr>
+    <td><code>:serviceName</code></td>
+    <td>No</td>
+    <td></td>
+    <td>The name of the service generating this span. This can be blank.</td>
+  </tr>
+</table>
+
+Here is the simplest example of creating a tracing span:
+
+```clojure
+(honeycomb/with-event {:traceId (honeycomb/generate-trace-id)} {}
+  ... Do stuff here ...)
+```
+
+You can create multiple spans that are part of the same trace. This will
+create two spans within a trace, but won't establish any relationship between
+them:
+
+```clojure
+(honeycomb/with-trace-id (honeycomb/generate-trace-id)
+  (honeycomb/with-event {:name "X"} {}
+    ... Do stuff ...)
+  ... Do more stuff ...
+  (honeycomb/with-event {:name "Y"} {}
+    ... Do even more stuff ...))
+```
+
+This produces a trace that looks like this:
+
+```
++-----------------+ +-------+
+|        X        | |   Y   |
++-----------------+ +-------+
+```
+
+It's usually useful to establish a relationship between spans in a trace.
+There are two patterns:
+
+1. _While_ doing X we did Y.
+2. _Because_ we did X we _subsequently_ did Y.
+
+The first of those is most easily expressed by nesting `with-event` calls:
+
+```clojure
+(honeycomb/with-event {:name "X" :traceId (honeycomb/generate-trace-id)} {}
+  ... Some X ...
+  (honeycomb/with-event {:name "Y"} {}
+    ...  Some Y ...)
+  ... Some more X ...)
+```
+
+This produces a trace that looks like this:
+
+```
++-----------------+
+|        X        |
++-----------------+
+     +-------+
+     |   Y   |
+     +-------+
+```
+
+The second case can be accomplished like so:
+
+```clojure
+(honeycomb/with-trace-id (honeycomb/generate-trace-id)
+  (let [x-id (honeycomb/generate-span-id)]
+    (honeycomb/with-event {:name "X" :id x-id} {}
+      ... Some X ...)
+    (honeycomb/with-event {:name "Y" :parentId x-id} {}
+      ... Some Y ....)))
+```
+
+This produces a trace that looks like this:
+
+```
++-----------------+
+|        X        |
++-----------------+
+                  +-------+
+                  |   Y   |
+                  +-------+
+```
+
+The above may not make a lot of sense in the context of a single chunk of
+code, but sequential (as opposed to enclosing) spans are a natural way of
+expressing chains of calls between services in a distributed system. There is
+support in the clj-honeycomb Ring middleware to make this feel natural in a
+Clojure application.
 
 ### Middleware
 
