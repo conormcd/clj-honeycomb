@@ -323,6 +323,28 @@ of the request and response data but adds some static and dynamic fields.
 ;  "status" 404}
 ```
 
+Tracing support is included in the Ring middleware. If the `X-Honeycomb-Trace`
+header is present in a request then it will be decoded to propagate the trace
+ID and to link the event to the parent span in the calling code. The format of
+the header is the same as in other Honeycomb libraries and is as follows:
+
+```bnf
+<header>  ::= "X-Honeycomb-Trace: " <value>
+<value>   ::= version ";" data
+<version> ::= "1"
+<data>    ::= <pair> "," <pair>
+            | <pair>
+<pair>    ::= "trace_id=" [^,]+
+            | "parent_id=" [^,]+
+            | "context=" <base64-encoded-json>
+```
+
+If the version is wrong or if the `trace_id` is not present then the
+middleware will act as if the header was not present. The `parent_id` is
+optional but recommended and must refer to the ID of a span associated with
+the same trace ID. The `context` is also optional and must be a Base64-encoded
+JSON string containing data that should be added to the event.
+
 ### Monitoring
 
 The libhoney-java library sends events to Honeycomb asynchronously on a

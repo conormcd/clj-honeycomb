@@ -16,6 +16,8 @@
                                :password :env/clojars_password
                                :sign-releases false}]]
   :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.clojure/data.codec "0.1.1"]
+                 [org.clojure/data.json "0.2.6"]
                  [clojure-future-spec "1.9.0"]
                  [io.honeycomb.libhoney/libhoney-java ~libhoney-version]]
   :java-source-paths ["src-java"]
