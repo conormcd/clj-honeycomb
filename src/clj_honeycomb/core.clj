@@ -96,6 +96,13 @@
                    ::response-observer
                    ::sample-rate
                    ::transport-options]))
+(s/def ::create-event-options
+  (s/keys :opt-un [::api-host
+                   ::data-set
+                   ::metadata
+                   ::sample-rate
+                   ::timestamp
+                   ::write-key]))
 (s/def ::send-options
   (s/keys :opt-un [::api-host
                    ::data-set
@@ -311,12 +318,7 @@
 (s/fdef create-event
   :args (s/cat :honeycomb-client (partial instance? HoneyClient)
                :event-data map?
-               :options (s/keys :opt-un [::api-host
-                                         ::data-set
-                                         ::metadata
-                                         ::sample-rate
-                                         ::timestamp
-                                         ::write-key]))
+               :options ::create-event-options)
   :ret (partial instance? Event))
 
 (defn- create-event

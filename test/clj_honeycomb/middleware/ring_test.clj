@@ -174,3 +174,6 @@
                (is (empty? events))
                (is (= 1 (count errors)))
                (is (< 1 (:sample-rate (:honeycomb-event-options options))))))))))))
+
+(deftest nonsense-tests-just-to-cover-spec
+  (s/explain-data :clj-honeycomb.middleware.ring/with-honeycomb-event-options {:foo {:bar :baz}}))
