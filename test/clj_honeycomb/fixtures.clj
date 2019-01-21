@@ -1,13 +1,15 @@
-(ns clj-honeycomb.global-fixtures
+(ns clj-honeycomb.fixtures
   "A combination of functions that must get called once and early during
    testing and some global testing data."
   (:require [clojure.spec.test.alpha :as stest]
+            [clojure.test :as clj-test]
             [ring.mock.request :as mock-request])
   (:import (java.util UUID)))
 
-;; Functions which we want called once and early during testing.
-(set! *warn-on-reflection* true)
-(stest/instrument)
+(defn use-fixtures
+  "Install all the fixtures we'll use."
+  []
+  (clj-test/use-fixtures :once #(do (stest/instrument) (%))))
 
 ;; Notes for testing:
 ;;

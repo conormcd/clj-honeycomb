@@ -1,17 +1,22 @@
 (ns clj-honeycomb.fields-test
   (:use [clojure.future])
-  (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
-
-            [clojure.spec.test.alpha :refer (check with-instrument-disabled)]
+  (:require [clojure.spec.test.alpha :refer (check with-instrument-disabled)]
             [clojure.test :refer (are deftest is testing)]
 
-            [clj-honeycomb.fields :as fields])
+            [clj-honeycomb.fields :as fields]
+            [clj-honeycomb.fixtures :refer (kitchen-sink-realized
+                                            make-kitchen-sink
+                                            use-fixtures)])
   (:import (java.util UUID)
            (clojure.lang IBlockingDeref
                          IDeref
                          IPending
                          Repeat)
            (io.honeycomb.libhoney ValueSupplier)))
+
+(set! *warn-on-reflection* true)
+
+(use-fixtures)
 
 (deftest ->ValueSupplier-works
   (testing "Simple no-arg function"

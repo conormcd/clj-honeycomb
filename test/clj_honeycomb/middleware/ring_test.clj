@@ -1,18 +1,22 @@
 (ns clj-honeycomb.middleware.ring-test
-  (:require [clj-honeycomb.global-fixtures :refer (sample-ring-request
-                                                   sample-ring-request-extracted
-                                                   sample-ring-response
-                                                   sample-ring-response-extracted)]
-
-            [clojure.spec.alpha :as s]
+  (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [clojure.spec.test.alpha :refer (check)]
             [clojure.test :refer (are deftest is testing)]
 
             [clj-honeycomb.fields :as fields]
+            [clj-honeycomb.fixtures :refer (sample-ring-request
+                                            sample-ring-request-extracted
+                                            sample-ring-response
+                                            sample-ring-response-extracted
+                                            use-fixtures)]
             [clj-honeycomb.middleware.ring :as middle]
             [clj-honeycomb.testing-utils :refer (validate-events)])
   (:import (io.honeycomb.libhoney Event)))
+
+(set! *warn-on-reflection* true)
+
+(use-fixtures)
 
 (deftest default-extract-request-fields-works
   (testing "Known values"

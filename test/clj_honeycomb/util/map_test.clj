@@ -2,7 +2,12 @@
   (:require [clojure.spec.test.alpha :refer (check with-instrument-disabled)]
             [clojure.test :refer (are deftest is testing)]
 
+            [clj-honeycomb.fixtures :refer (use-fixtures)]
             [clj-honeycomb.util.map :as util-map]))
+
+(set! *warn-on-reflection* true)
+
+(use-fixtures)
 
 (deftest stringify-keys-works
   (testing "Valid input"

@@ -1,7 +1,5 @@
 (ns clj-honeycomb.core-test
-  (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
-
-            [clojure.data.json :as json]
+  (:require [clojure.data.json :as json]
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [clojure.spec.test.alpha :refer (check with-instrument-disabled)]
@@ -10,6 +8,9 @@
             [stub-http.core :as stub-http]
 
             [clj-honeycomb.core :as honeycomb]
+            [clj-honeycomb.fixtures :refer (kitchen-sink-realized
+                                            make-kitchen-sink
+                                            use-fixtures)]
             [clj-honeycomb.testing-utils :refer (no-op-client recording-client validate-events)])
   (:import (clojure.lang ExceptionInfo)
            (stub_http.core NanoFakeServer)
@@ -24,6 +25,10 @@
                                             ServerAccepted
                                             ServerRejected
                                             Unknown)))
+
+(set! *warn-on-reflection* true)
+
+(use-fixtures)
 
 (defn- event->fields
   "A helper to extract the fields from an event while avoiding NPEs and ensuring
