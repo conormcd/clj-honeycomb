@@ -1,7 +1,5 @@
 (ns clj-honeycomb.util.keyword-test
-  (:require [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as gen]
-            [clojure.spec.test.alpha :refer (with-instrument-disabled)]
+  (:require [clojure.spec.test.alpha :refer (check with-instrument-disabled)]
             [clojure.test :refer (are deftest is testing)]
 
             [clj-honeycomb.util.keyword :as util-keyword]))
@@ -20,5 +18,4 @@
       (is (thrown? IllegalArgumentException
                    (util-keyword/stringify-keyword 1)))))
   (testing "Randomly generated input"
-    (doseq [k (gen/sample (s/gen keyword?))]
-      (is (string? (util-keyword/stringify-keyword k))))))
+    (check `util-keyword/stringify-keyword)))
