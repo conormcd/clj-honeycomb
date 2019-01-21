@@ -125,15 +125,14 @@
            sample-rate
            write-key]}]
   (let [[static-fields dynamic-fields] (fields/separate (or global-fields {}))]
-    (cond-> (LibHoney/options)
-      api-host (.setApiHost (URI. api-host))
-      data-set (.setDataset data-set)
-      event-post-processor (.setEventPostProcessor event-post-processor)
-      (not-empty static-fields) (.setGlobalFields static-fields)
-      (not-empty dynamic-fields) (.setGlobalDynamicFields dynamic-fields)
-      sample-rate (.setSampleRate sample-rate)
-      write-key (.setWriteKey write-key)
-      true (.build))))
+    (.build (cond-> (LibHoney/options)
+              api-host (.setApiHost (URI. api-host))
+              data-set (.setDataset data-set)
+              event-post-processor (.setEventPostProcessor event-post-processor)
+              (not-empty static-fields) (.setGlobalFields static-fields)
+              (not-empty dynamic-fields) (.setGlobalDynamicFields dynamic-fields)
+              sample-rate (.setSampleRate sample-rate)
+              write-key (.setWriteKey write-key)))))
 
 (s/fdef transport-options
   :args (s/cat :options ::transport-options)
@@ -153,20 +152,19 @@
            maximum-pending-batch-requests
            queue-capacity
            socket-timeout]}]
-  (cond-> (LibHoney/transportOptions)
-    batch-size (.setBatchSize batch-size)
-    batch-timeout-millis (.setBatchTimeoutMillis batch-timeout-millis)
-    buffer-size (.setBufferSize buffer-size)
-    connection-request-timeout (.setConnectionRequestTimeout connection-request-timeout)
-    connect-timeout (.setConnectTimeout connect-timeout)
-    io-thread-count (.setIoThreadCount io-thread-count)
-    max-connections (.setMaxConnections max-connections)
-    max-connections-per-api-host (.setMaxConnectionsPerApiHost max-connections-per-api-host)
-    maximum-http-request-shutdown-wait (.setMaximumHttpRequestShutdownWait maximum-http-request-shutdown-wait)
-    maximum-pending-batch-requests (.setMaximumPendingBatchRequests maximum-pending-batch-requests)
-    queue-capacity (.setQueueCapacity queue-capacity)
-    socket-timeout (.setSocketTimeout socket-timeout)
-    true (.build)))
+  (.build (cond-> (LibHoney/transportOptions)
+            batch-size (.setBatchSize batch-size)
+            batch-timeout-millis (.setBatchTimeoutMillis batch-timeout-millis)
+            buffer-size (.setBufferSize buffer-size)
+            connection-request-timeout (.setConnectionRequestTimeout connection-request-timeout)
+            connect-timeout (.setConnectTimeout connect-timeout)
+            io-thread-count (.setIoThreadCount io-thread-count)
+            max-connections (.setMaxConnections max-connections)
+            max-connections-per-api-host (.setMaxConnectionsPerApiHost max-connections-per-api-host)
+            maximum-http-request-shutdown-wait (.setMaximumHttpRequestShutdownWait maximum-http-request-shutdown-wait)
+            maximum-pending-batch-requests (.setMaximumPendingBatchRequests maximum-pending-batch-requests)
+            queue-capacity (.setQueueCapacity queue-capacity)
+            socket-timeout (.setSocketTimeout socket-timeout))))
 
 (s/fdef response-observer
   :args (s/cat :response-observer ::response-observer)
