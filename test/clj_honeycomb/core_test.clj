@@ -549,7 +549,7 @@
                  "bar" "bar"
                  "baz" "baz"}
                 (dissoc event-data "elapsed-ms")))
-         (is (< 100 (get event-data "elapsed-ms" -1) 120))))))
+         (is (< 100 (get event-data "elapsed-ms" -1)))))))
   (testing "Code that throws both throws AND sends the event"
     (validate-events
      (fn []
