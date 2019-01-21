@@ -6,6 +6,8 @@
             [clj-honeycomb.core :as honeycomb]
             [clj-honeycomb.util.map :as map-util]))
 
+(set! *warn-on-reflection* true)
+
 (s/fdef default-extract-request-fields
   :args (s/cat :request map?)
   :ret map?)

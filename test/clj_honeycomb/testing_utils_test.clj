@@ -1,12 +1,13 @@
 (ns clj-honeycomb.testing-utils-test
-  (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
-
-            [clojure.spec.alpha :as s]
+  (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [clojure.spec.test.alpha :refer (with-instrument-disabled)]
             [clojure.test :refer (deftest is testing)]
 
             [clj-honeycomb.core :as honeycomb]
+            [clj-honeycomb.fixtures :refer (kitchen-sink-realized
+                                            make-kitchen-sink
+                                            use-fixtures)]
             [clj-honeycomb.testing-utils :as tu])
   (:import (io.honeycomb.libhoney Event
                                   HoneyClient
@@ -15,6 +16,10 @@
                                             ServerAccepted
                                             ServerRejected
                                             Unknown)))
+
+(set! *warn-on-reflection* true)
+
+(use-fixtures)
 
 (deftest no-op-client-works
   (testing "Default options work"
