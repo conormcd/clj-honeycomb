@@ -4,7 +4,7 @@
             [clojure.data.json :as json]
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
-            [clojure.spec.test.alpha :refer (with-instrument-disabled)]
+            [clojure.spec.test.alpha :refer (check with-instrument-disabled)]
             [clojure.test :refer (are deftest is testing)]
 
             [stub-http.core :as stub-http]
@@ -219,13 +219,7 @@
         (.onServerRejected ro server-rejected)
         (.onUnknown ro unknown)))
     (testing "Randomly generated values work"
-      (doseq [ro (gen/sample (s/gen :clj-honeycomb.core/response-observer))]
-        (let [^ResponseObserver ro (#'honeycomb/response-observer ro)]
-          (is (instance? ResponseObserver ro))
-          (.onClientRejected ro client-rejected)
-          (.onServerAccepted ro server-accepted)
-          (.onServerRejected ro server-rejected)
-          (.onUnknown ro unknown))))))
+      (check `honeycomb/response-observer))))
 
 (deftest client-works
   (testing "Without a ResponseObserver"

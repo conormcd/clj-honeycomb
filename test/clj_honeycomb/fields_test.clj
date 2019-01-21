@@ -2,9 +2,7 @@
   (:use [clojure.future])
   (:require [clj-honeycomb.global-fixtures :refer (kitchen-sink-realized make-kitchen-sink)]
 
-            [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as gen]
-            [clojure.spec.test.alpha :refer (with-instrument-disabled)]
+            [clojure.spec.test.alpha :refer (check with-instrument-disabled)]
             [clojure.test :refer (are deftest is testing)]
 
             [clj-honeycomb.fields :as fields])
@@ -39,11 +37,7 @@
         :keyword ":keyword"
         uuid (str uuid))))
   (testing "Randomly generated values"
-    (doseq [input (gen/sample (s/gen any?))]
-      (let [output (#'fields/prepare-value-for-json input)]
-        (is (not (or (keyword? output)
-                     (ratio? output)
-                     (instance? UUID output))))))))
+    (check `fields/prepare-value-for-json)))
 
 (deftest realize-value-works
   (testing "Testing the kitchen sink"
@@ -64,13 +58,7 @@
   (testing "Make sure we cover ValueSuppliers too"
     (is (= 2 (#'fields/realize-value (fields/->ValueSupplier inc 1)))))
   (testing "Randomly generated data"
-    (doseq [input (gen/sample (s/gen any?))]
-      (let [output (#'fields/realize-value input)]
-        (is (not (or (instance? IBlockingDeref output)
-                     (instance? IDeref output)
-                     (instance? IPending output)
-                     (instance? Repeat output)
-                     (instance? ValueSupplier output))))))))
+    (check `fields/realize-value)))
 
 (deftest maybe-value-supplier-works
   (testing "Known values"
@@ -113,15 +101,7 @@
                   (map key)
                   set)))))
   (testing "Randomly generated data"
-    (doseq [input (gen/sample (s/gen any?))]
-      (let [output (#'fields/maybe-value-supplier input)]
-        (is (not (or (instance? IBlockingDeref output)
-                     (instance? IDeref output)
-                     (instance? IPending output)
-                     (instance? Repeat output)
-                     (map? output)
-                     (sequential? output)
-                     (set? output))))))))
+    (check `fields/maybe-value-supplier)))
 
 (deftest separate-works
   (testing "Static fields are passed through unchanged"
@@ -138,10 +118,7 @@
       (is (thrown? IllegalArgumentException (fields/separate 1)))
       (is (thrown? IllegalArgumentException (fields/separate [])))))
   (testing "Randomly generated data"
-    (doseq [input (gen/sample (s/gen map?))]
-      (let [output (fields/separate input)]
-        (is (= 2 (count output)))
-        (is (every? map? output))))))
+    (check `fields/separate)))
 
 (deftest realize-works
   (testing "Test the kitchen sink"
@@ -152,7 +129,4 @@
       (is (thrown? IllegalArgumentException (fields/realize 1)))
       (is (thrown? IllegalArgumentException (fields/realize [])))))
   (testing "Randomly generated data"
-    (doseq [input (gen/sample (s/gen map?))]
-      (let [output (fields/realize input)]
-        (is (map? output))
-        (is (every? string? (keys output)))))))
+    (check `fields/realize)))

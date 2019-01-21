@@ -6,6 +6,7 @@
 
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
+            [clojure.spec.test.alpha :refer (check)]
             [clojure.test :refer (are deftest is testing)]
 
             [clj-honeycomb.fields :as fields]
@@ -21,11 +22,7 @@
       {} {}
       sample-ring-request sample-ring-request-extracted))
   (testing "Randomly generated data"
-    (doseq [request (gen/sample (s/gen map?))]
-      (let [fields (#'middle/default-extract-request-fields request)]
-        (is (map? fields))
-        (is (every? string? (keys fields)))
-        (is (every? (complement map?) (vals fields)))))))
+    (check `middle/default-extract-request-fields)))
 
 (deftest default-extract-response-fields-works
   (testing "Known values"
@@ -35,11 +32,7 @@
       {} {}
       sample-ring-response sample-ring-response-extracted))
   (testing "Randomly generated data"
-    (doseq [response (gen/sample (s/gen map?))]
-      (let [fields (#'middle/default-extract-response-fields response)]
-        (is (map? fields))
-        (is (every? string? (keys fields)))
-        (is (every? (complement map?) (vals fields)))))))
+    (check `middle/default-extract-response-fields)))
 
 (deftest with-honeycomb-event-works
   (let [happy-handler (fn
