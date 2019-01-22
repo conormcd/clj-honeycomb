@@ -14,12 +14,20 @@ workflows:
       - test:
           requires:
             - cache-deps
+      - test-1-9:
+          requires:
+            - cache-deps
+      - test-1-10:
+          requires:
+            - cache-deps
       - release:
           context: clj-honeycomb-release
           requires:
             - docs
             - lint
             - test
+            - test-1-9
+            - test-1-10
           filters:
             branches:
               only: master
@@ -71,6 +79,34 @@ jobs:
           name: Upload code coverage
           command: |
             bash <(curl -s https://codecov.io/bash)
+  test-1-9:
+    docker:
+      - image: circleci/clojure
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-m2-{{ checksum "project.clj" }}
+      - run:
+          name: Test with Clojure 1.9
+          command: |
+            sed -e 's,org.clojure/clojure "1.8.0",org.clojure/clojure "1.9.0",' project.clj > project.clj.new
+            mv project.clj.new project.clj
+            lein test
+  test-1-10:
+    docker:
+      - image: circleci/clojure
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-m2-{{ checksum "project.clj" }}
+      - run:
+          name: Test with Clojure 1.10
+          command: |
+            sed -e 's,org.clojure/clojure "1.8.0",org.clojure/clojure "1.10.0",' project.clj > project.clj.new
+            mv project.clj.new project.clj
+            lein test
   release:
     docker:
       - image: circleci/clojure
