@@ -22,7 +22,8 @@
   :pedantic? :abort
   :plugins [[lein-cljfmt "0.6.3"]
             [lein-cloverage "1.0.13" :exclusions [org.clojure/clojure]]
-            [lein-codox "0.10.5"]]
+            [lein-codox "0.10.5"]
+            [lein-kibit "0.1.6"]]
   :profiles {:dev {:dependencies [[cloverage "1.0.13" :exclusions [org.clojure/clojure]]
                                   [org.clojure/data.json "0.2.6"]
                                   [org.clojure/test.check "0.10.0-alpha3"]

@@ -65,7 +65,16 @@ jobs:
       - restore_cache:
           keys:
             - v1-m2-{{ checksum "project.clj" }}
+      - run:
+          name: joker --lint
+          command: |
+            curl -Lso joker.zip https://github.com/candid82/joker/releases/download/v0.11.1/joker-0.11.1-linux-amd64.zip
+            unzip joker.zip
+            echo '{:known-macros [clojure.spec.alpha/fdef] :rules {:if-without-else true :unused-fn-parameters true}}' > ~/.joker
+            find src test -type f -name '*.clj' -print0 | \
+              xargs -0 -n1 ./joker --lint
       - run: lein cljfmt check
+      - run: lein kibit
   test:
     docker:
       - image: circleci/clojure
