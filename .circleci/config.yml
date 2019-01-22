@@ -66,6 +66,7 @@ jobs:
           keys:
             - v1-m2-{{ checksum "project.clj" }}
       - run: lein cljfmt check
+      - run: lein kibit
   test:
     docker:
       - image: circleci/clojure
