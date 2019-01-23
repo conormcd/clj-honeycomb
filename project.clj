@@ -29,6 +29,6 @@
                                   [org.clojure/test.check "0.10.0-alpha3"]
                                   [ch.qos.logback/logback-classic "1.2.3"]
                                   [ring/ring-mock "0.3.2"]
-                                  [se.haleby/stub-http "0.2.5"]]
+                                  [se.haleby/stub-http "0.2.7"]]
                    :codox {:exclude-vars nil
                            :namespaces :all}}})
