@@ -5,26 +5,38 @@ workflows:
   build-and-publish:
     jobs:
       - cache-deps
+      - joker
+      - cljfmt:
+          requires:
+            - cache-deps
+            - joker
+      - kibit:
+          requires:
+            - cache-deps
+            - joker
       - docs:
           requires:
             - cache-deps
-      - lint:
-          requires:
-            - cache-deps
+            - joker
       - test:
           requires:
             - cache-deps
+            - joker
       - test-1-9:
           requires:
             - cache-deps
+            - joker
       - test-1-10:
           requires:
             - cache-deps
+            - joker
       - release:
           context: clj-honeycomb-release
           requires:
+            - cljfmt
             - docs
-            - lint
+            - joker
+            - kibit
             - test
             - test-1-9
             - test-1-10
@@ -57,14 +69,11 @@ jobs:
       - run: lein codox
       - store_artifacts:
           path: target/doc
-  lint:
+  joker:
     docker:
       - image: circleci/clojure
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - v1-m2-{{ checksum "project.clj" }}
       - run:
           name: joker --lint
           command: |
@@ -73,7 +82,23 @@ jobs:
             echo '{:known-macros [clojure.spec.alpha/fdef] :rules {:if-without-else true :unused-fn-parameters true}}' > ~/.joker
             find src test -type f -name '*.clj' -print0 | \
               xargs -0 -n1 ./joker --lint
+  cljfmt:
+    docker:
+      - image: circleci/clojure
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-m2-{{ checksum "project.clj" }}
       - run: lein cljfmt check
+  kibit:
+    docker:
+      - image: circleci/clojure
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-m2-{{ checksum "project.clj" }}
       - run: lein kibit
   test:
     docker:
