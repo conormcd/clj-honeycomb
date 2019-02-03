@@ -248,7 +248,8 @@
     (with-open [client (honeycomb/client {:data-set "data-set"
                                           :event-pre-processor (fn [event-data options]
                                                                  [event-data options])
-                                          :write-key "write-key"})])))
+                                          :write-key "write-key"})]
+      (is (instance? HoneyClient client)))))
 
 (deftest init-and-initialized?-works
   (testing "Initialize with a map"
