@@ -61,7 +61,7 @@
             event (into {} (.getFields ^Event (first @events)))]
         (is (= (sort (keys expected)) (sort (keys event))))
         (doseq [[k v] expected]
-          (is (= v (get event k)) k)))))
+          (is (= v (get event k)) (str k))))))
   (testing "The first argument must be an atom-wrapped vector"
     (with-instrument-disabled
       (is (thrown? IllegalArgumentException (tu/recording-client nil {})))
