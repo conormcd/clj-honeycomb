@@ -12,8 +12,6 @@
            (io.honeycomb.libhoney.transport Transport)
            (clj_honeycomb Client)))
 
-(set! *warn-on-reflection* true)
-
 (s/fdef dummy-client
   :args (s/cat :client-options :clj-honeycomb.core/client-options
                :submission-fn fn?)

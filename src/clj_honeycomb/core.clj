@@ -27,8 +27,6 @@
                                   TransportOptions)
            (clj_honeycomb Client)))
 
-(set! *warn-on-reflection* true)
-
 (def ^:private pos-java-int?
   "Like pos-int? except within the range of numbers of java.lang.Integer."
   (s/int-in 1 Integer/MAX_VALUE))

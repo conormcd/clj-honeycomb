@@ -2,8 +2,6 @@
   "Utility functions for manipulating keywords"
   (:require [clojure.spec.alpha :as s]))
 
-(set! *warn-on-reflection* true)
-
 (s/fdef stringify-keyword
   :args (s/cat :k keyword?)
   :ret string?)

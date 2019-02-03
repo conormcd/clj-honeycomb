@@ -19,8 +19,6 @@
                          Repeat)
            (io.honeycomb.libhoney ValueSupplier)))
 
-(set! *warn-on-reflection* true)
-
 (s/fdef ->ValueSupplier
   :args (s/cat :f fn?
                :args (s/* any?))

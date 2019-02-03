@@ -5,8 +5,6 @@
             [clj-honeycomb.fixtures :refer (use-fixtures)]
             [clj-honeycomb.util.map :as util-map]))
 
-(set! *warn-on-reflection* true)
-
 (use-fixtures)
 
 (deftest stringify-keys-works

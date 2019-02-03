@@ -26,8 +26,6 @@
                                             ServerRejected
                                             Unknown)))
 
-(set! *warn-on-reflection* true)
-
 (use-fixtures)
 
 (defn- event->fields

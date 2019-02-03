@@ -17,8 +17,6 @@
                                             ServerRejected
                                             Unknown)))
 
-(set! *warn-on-reflection* true)
-
 (use-fixtures)
 
 (deftest no-op-client-works

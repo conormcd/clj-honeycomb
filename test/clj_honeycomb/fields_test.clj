@@ -14,8 +14,6 @@
                          Repeat)
            (io.honeycomb.libhoney ValueSupplier)))
 
-(set! *warn-on-reflection* true)
-
 (use-fixtures)
 
 (deftest ->ValueSupplier-works

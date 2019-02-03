@@ -14,8 +14,6 @@
             [clj-honeycomb.testing-utils :refer (validate-events)])
   (:import (io.honeycomb.libhoney Event)))
 
-(set! *warn-on-reflection* true)
-
 (use-fixtures)
 
 (deftest default-extract-request-fields-works

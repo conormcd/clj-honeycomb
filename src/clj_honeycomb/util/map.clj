@@ -9,8 +9,6 @@
 
             [clj-honeycomb.util.keyword :refer (stringify-keyword)]))
 
-(set! *warn-on-reflection* true)
-
 (s/fdef stringify-keys
   :args (s/cat :m map?)
   :ret map?)
