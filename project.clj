@@ -24,7 +24,12 @@
   :plugins [[lein-cljfmt "0.6.3"]
             [lein-cloverage "1.0.13" :exclusions [org.clojure/clojure]]
             [lein-codox "0.10.5"]
-            [lein-kibit "0.1.6"]]
+            [lein-kibit "0.1.6"]
+            [lein-nvd "0.6.0" :exclusions [org.apache.maven.wagon/wagon-http
+                                           org.codehaus.plexus/plexus-utils
+                                           org.slf4j/slf4j-api
+                                           org.slf4j/jcl-over-slf4j]]]
+  :nvd {:data-directory "/tmp/nvd/data"}
   :profiles {:dev {:dependencies [[cloverage "1.0.13" :exclusions [org.clojure/clojure]]
                                   [org.clojure/data.json "0.2.6"]
                                   [org.clojure/test.check "0.10.0-alpha3"]
