@@ -37,6 +37,7 @@
     #(s/gen #{nil
               (fn [_] nil)})))
 
+(s/def ::additional-user-agent (s/and string? seq))
 (s/def ::api-host (s/and string? seq))
 (s/def ::batch-size pos-java-int?)
 (s/def ::batch-timeout-millis pos-java-int?)
@@ -74,7 +75,8 @@
                    ::on-server-rejected
                    ::on-unknown]))
 (s/def ::transport-options
-  (s/keys :opt-un [::batch-size
+  (s/keys :opt-un [::additional-user-agent
+                   ::batch-size
                    ::batch-timeout-millis
                    ::buffer-size
                    ::connection-request-timeout
@@ -140,7 +142,8 @@
 
 (defn- transport-options
   "Turn a map into a TransportOptions object to initialize the LibHoney client."
-  [{:keys [batch-size
+  [{:keys [additional-user-agent
+           batch-size
            batch-timeout-millis
            buffer-size
            connection-request-timeout
@@ -153,6 +156,7 @@
            queue-capacity
            socket-timeout]}]
   (.build (cond-> (LibHoney/transportOptions)
+            additional-user-agent (.setAdditionalUserAgent additional-user-agent)
             batch-size (.setBatchSize batch-size)
             batch-timeout-millis (.setBatchTimeoutMillis batch-timeout-millis)
             buffer-size (.setBufferSize buffer-size)
@@ -245,6 +249,7 @@
                          documentation for TransportOptions to understand their
                          exact meanings.
 
+                         :additional-user-agent
                          :batch-size
                          :batch-timeout-millis
                          :buffer-size

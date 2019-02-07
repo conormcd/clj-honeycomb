@@ -1,4 +1,4 @@
-(def libhoney-version "1.0.2")
+(def libhoney-version "1.0.6")
 
 (defproject conormcd/clj-honeycomb (str libhoney-version
                                         (or (some->> "CIRCLE_BUILD_NUM" System/getenv (str "."))

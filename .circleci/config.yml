@@ -169,5 +169,5 @@ jobs:
       - run:
           name: Tag the release
           command: |
-            git tag "1.0.2.${CIRCLE_BUILD_NUM}"
+            git tag "1.0.6.${CIRCLE_BUILD_NUM}"
             git push --tags

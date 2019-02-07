@@ -1,7 +1,7 @@
 # clj-honeycomb
 
 A library for sending events to [Honeycomb.io](https://www.honeycomb.io/),
-wrapping [libhoney-java 1.0.2](https://github.com/honeycombio/libhoney-java).
+wrapping [libhoney-java 1.0.6](https://github.com/honeycombio/libhoney-java).
 
 [![Clojars Project](https://img.shields.io/clojars/v/conormcd/clj-honeycomb.svg)](https://clojars.org/conormcd/clj-honeycomb)
 [![CircleCI](https://circleci.com/gh/conormcd/clj-honeycomb.svg?style=svg)](https://circleci.com/gh/conormcd/clj-honeycomb)
@@ -23,9 +23,9 @@ wrapping [libhoney-java 1.0.2](https://github.com/honeycombio/libhoney-java).
 Include the following in your `project.clj`:
 
 ```clojure
-; This is libhoney-java 1.0.2 build number 1 on CircleCI
+; This is libhoney-java 1.0.6 build number 1 on CircleCI
 ; The most recent version can be found via the Clojars badge above
-[conormcd/clj-honeycomb "1.0.2.1"]
+[conormcd/clj-honeycomb "1.0.6.1"]
 ```
 
 Then initialize the library somewhere:

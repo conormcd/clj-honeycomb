@@ -135,7 +135,8 @@
 (deftest transport-options-works
   ; By hardcoding these transport options here, this test will also detect
   ; changes in the underlying libhoney-java library.
-  (let [default-transport-options {:batchSize 50
+  (let [default-transport-options {:additionalUserAgent ""
+                                   :batchSize 50
                                    :batchTimeoutMillis 100
                                    :bufferSize 8192
                                    :connectTimeout 0
@@ -159,6 +160,9 @@
 
       {}
       default-transport-options
+
+      {:additional-user-agent "foo"}
+      (assoc default-transport-options :additionalUserAgent "foo")
 
       {:batch-size 100}
       (assoc default-transport-options :batchSize 100)
