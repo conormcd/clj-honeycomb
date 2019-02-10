@@ -540,6 +540,12 @@
                (is (= 1 (get body "samplerate")))
                (is (= {"foo" "bar"} (get body "data"))))))))))
 
+(deftest generate-trace-id-works
+  (check `honeycomb/generate-trace-id))
+
+(deftest generate-span-id-works
+  (check `honeycomb/generate-span-id))
+
 (deftest with-event-works
   (testing "Code that doesn't throw still returns AND sends the event"
     (validate-events
@@ -556,8 +562,8 @@
          (is (= {"foo" "foo"
                  "bar" "bar"
                  "baz" "baz"}
-                (dissoc event-data "elapsed-ms")))
-         (is (< 100 (get event-data "elapsed-ms" -1)))))))
+                (dissoc event-data "durationMs")))
+         (is (< 100 (get event-data "durationMs" -1)))))))
   (testing "Code that throws both throws AND sends the event"
     (validate-events
      (fn []
@@ -573,9 +579,112 @@
          (is (= {"foo" "foo"
                  "bar" "bar"
                  "baz" "baz"}
-                (dissoc event-data "exception" "elapsed-ms")))
-         (is (some-> (get event-data "elapsed-ms") pos?))
-         (is (instance? Exception (get event-data "exception"))))))))
+                (dissoc event-data "exception" "durationMs")))
+         (is (some-> (get event-data "durationMs") pos?))
+         (is (instance? Exception (get event-data "exception")))))))
+  (testing "with-event can generate trace spans"
+    (let [trace-id (honeycomb/generate-trace-id)]
+      (testing "The bare minimum"
+        (validate-events
+         (fn []
+           (is (= :body-value
+                  (honeycomb/with-event {:foo "bar"
+                                         :traceId trace-id} {}
+                    :body-value))))
+         (fn [events errors]
+           (is (= 1 (count events)))
+           (when-let [event (->> events (map event->fields) first)]
+             (is (some? (get event "id")))
+             (is (float? (get event "durationMs")))
+             (is (= {"traceId" trace-id
+                     "parentId" nil
+                     "foo" "bar"}
+                    (dissoc event "durationMs" "id"))))
+           (is (empty? errors)))))
+      (testing "Specifying an ID"
+        (validate-events
+         (fn []
+           (is (= :body-value
+                  (honeycomb/with-event {:foo "bar"
+                                         :id "some-id"
+                                         :traceId trace-id} {}
+                    :body-value))))
+         (fn [events errors]
+           (is (= 1 (count events)))
+           (when-let [event (->> events (map event->fields) first)]
+             (is (float? (get event "durationMs")))
+             (is (= {"traceId" trace-id
+                     "parentId" nil
+                     "foo" "bar"
+                     "id" "some-id"}
+                    (dissoc event "durationMs"))))
+           (is (empty? errors)))))
+      (testing "Nested events create parent-child spans"
+        (validate-events
+         (fn []
+           (is (= :body-value
+                  (honeycomb/with-event {:foo "bar"
+                                         :traceId trace-id} {}
+                    (honeycomb/with-event {:baz "quux"} {}
+                      :body-value)))))
+         (fn [events errors]
+           (let [events (map event->fields events)]
+             (is (= 2 (count events)))
+             (is (every? some? (map #(get % "id") events)))
+             (is (every? float? (map #(get % "durationMs") events)))
+             (is (= [{"traceId" trace-id
+                      "baz" "quux"}
+                     {"traceId" trace-id
+                      "foo" "bar"}]
+                    (map #(dissoc % "id" "parentId" "durationMs") events)))
+             (is (nil? (get (last events) "parentId")))
+             (is (some? (get (first events) "parentId")))
+             (is (= (get (first events) "parentId")
+                    (get (last events) "id"))))
+           (is (empty? errors)))))
+      (testing "Nested events create parent-child spans with with-trace-id"
+        (validate-events
+         (fn []
+           (is (= :body-value
+                  (honeycomb/with-trace-id trace-id
+                    (honeycomb/with-event {:foo "bar"} {}
+                      (honeycomb/with-event {:baz "quux"} {}
+                        :body-value))))))
+         (fn [events errors]
+           (let [events (map event->fields events)]
+             (is (= 2 (count events)))
+             (is (every? some? (map #(get % "id") events)))
+             (is (every? float? (map #(get % "durationMs") events)))
+             (is (= [{"traceId" trace-id
+                      "baz" "quux"}
+                     {"traceId" trace-id
+                      "foo" "bar"}]
+                    (map #(dissoc % "id" "parentId" "durationMs") events)))
+             (is (nil? (get (last events) "parentId")))
+             (is (some? (get (first events) "parentId")))
+             (is (= (get (first events) "parentId")
+                    (get (last events) "id"))))
+           (is (empty? errors)))))
+      (testing "It's possible to create non-enclosing parent-child relationships"
+        (let [x-id (honeycomb/generate-span-id)]
+          (validate-events
+           (fn []
+             (honeycomb/with-trace-id trace-id
+               (honeycomb/with-event {:doing "X" :id x-id} {}
+                 (Thread/sleep 50))
+               (honeycomb/with-event {:doing "Y" :parentId x-id} {}
+                 (Thread/sleep 50))))
+           (fn [events errors]
+             (let [events (map event->fields events)]
+               (is (every? some? (map #(get % "id") events)))
+               (is (= [{"traceId" trace-id
+                        "doing" "X"
+                        "parentId" nil}
+                       {"traceId" trace-id
+                        "doing" "Y"
+                        "parentId" (get (first events) "id")}]
+                      (map #(dissoc % "durationMs" "id") events))))
+             (is (empty? errors)))))))))
 
 (deftest live-test-against-honeycomb
   ; This has no assertions. It's here purely so that we can generate some known
