@@ -292,8 +292,8 @@ Clojure application.
 
 You can turn every request served by a Ring-compatible HTTP server into a
 Honeycomb event with `clj-honeycomb.middleware.ring/with-honeycomb-event`. By
-default the event will contain every item from the request map except for
-`:body` and from the response it will contain the status and all of the
+default the event will contain a selection of items from the request map and
+from the response it will contain the status and a small subset of the
 headers. You can customize the fields added to the event by passing an options
 map to the middleware.
 
