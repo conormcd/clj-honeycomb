@@ -121,12 +121,22 @@
          (assoc x "map" (dissoc x "exception"))))))
 
 (def sample-ring-request
-  (mock-request/request :get "/foo?bar=bar&baz=baz"))
+  (-> (mock-request/request :get "/foo?bar=bar&baz=baz")
+      (mock-request/header "Content-Length" 1234)
+      (mock-request/header "Host" "targetserver.com")
+      (mock-request/header "User-Agent" "Some Agent String")
+      (mock-request/header "Cookie" "This shoudln't be seen")
+      (mock-request/header "X-Forwarded-For" "1.2.3.4")
+      (mock-request/header "X-Forwarded-Proto" "https")))
 
 (def sample-ring-request-extracted
-  {"ring.request.headers.host" "localhost"
+  {"ring.request.headers.content-length" "1234"
+   "ring.request.headers.host" "targetserver.com"
+   "ring.request.headers.user-agent" "Some Agent String"
+   "ring.request.headers.x-forwarded-for" "1.2.3.4"
+   "ring.request.headers.x-forwarded-proto" "https"
+   "ring.request.params" "bar=bar&baz=baz"
    "ring.request.protocol" "HTTP/1.1"
-   "ring.request.query-string" "bar=bar&baz=baz"
    "ring.request.remote-addr" "localhost"
    "ring.request.request-method" :get
    "ring.request.scheme" :http
@@ -136,11 +146,15 @@
 
 (def sample-ring-response
   {:body "Hello world!"
-   :headers {"Content-Type" "text/plain"
+   :headers {"Content-Encoding" "gzip"
+             "Content-Length" 5678
+             "Content-Type" "text/plain"
+             "Set-Cookie" "This shouldn't be seen"
              :some-other-header :ring-is-funny}
    :status 200})
 
 (def sample-ring-response-extracted
-  {"ring.response.headers.Content-Type" "text/plain"
-   "ring.response.headers.some-other-header" :ring-is-funny
+  {"ring.response.headers.content-encoding" "gzip"
+   "ring.response.headers.content-length" 5678
+   "ring.response.headers.content-type" "text/plain"
    "ring.response.status" 200})

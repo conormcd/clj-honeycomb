@@ -8,12 +8,12 @@
             [clj-honeycomb.propagation :as propagation]
             [clj-honeycomb.util.map :as map-util]))
 
-(s/fdef get-request-header
+(s/fdef get-header
   :args (s/cat :request map?
                :header string?)
   :ret string?)
 
-(defn- get-request-header
+(defn- get-header
   "Get a header from a Ring request map, regardless of whether or not the header
    name is given as a string or keyword or whether or not the name of the header
    is lower cased.
@@ -30,6 +30,23 @@
             name
             str/lower-case)))
 
+(s/fdef get-headers
+  :args (s/cat :request map?
+               :headers (s/coll-of string?))
+  :ret (s/map-of string? string?))
+
+(defn- get-headers
+  "Like get-header, but for multiple headers.
+
+   request  The Ring request map.
+   headers  A list of headers to select from the request map."
+  [request headers]
+  (reduce (fn [acc header]
+            (when-let [v (get-header request header)]
+              (assoc acc header v)))
+          {}
+          (map (comp str/lower-case name) headers)))
+
 (s/fdef trace-data
   :args (s/cat :request map?)
   :ret map?)
@@ -41,7 +58,7 @@
 
    request  The Ring request map."
   [request]
-  (if-let [trace-header (get-request-header request "X-Honeycomb-Trace")]
+  (if-let [trace-header (get-header request "X-Honeycomb-Trace")]
     (try
       (or (propagation/unpack trace-header) {})
       (catch Exception _
@@ -57,7 +74,24 @@
 
    request  The Ring request map."
   [request]
-  (map-util/flatten-and-stringify "ring.request." (dissoc request :body)))
+  (->> {:headers (get-headers request ["Content-Length"
+                                       "Host"
+                                       "User-Agent"
+                                       "X-Forwarded-For"
+                                       "X-Forwarded-Proto"])}
+       (merge (cond (:query-params request) {:params (:query-params request)}
+                    (:query-string request) {:params (:query-string request)}
+                    :else nil))
+       (merge (select-keys request [:protocol
+                                    :remote-addr
+                                    :request-method
+                                    :scheme
+                                    :server-name
+                                    :server-port
+                                    :uri]))
+       (map-util/flatten-and-stringify "ring.request.")
+       (filter (comp some? val))
+       (into {})))
 
 (s/fdef default-extract-response-fields
   :args (s/cat :response map?)
@@ -68,8 +102,13 @@
 
    response  The Ring response map."
   [response]
-  (map-util/flatten-and-stringify "ring.response."
-                                  (select-keys response [:headers :status])))
+  (->> {:status (:status response)
+        :headers (get-headers response ["Content-Encoding"
+                                        "Content-Length"
+                                        "Content-Type"])}
+       (map-util/flatten-and-stringify "ring.response.")
+       (filter (comp some? val))
+       (into {})))
 
 (s/def ::extract-request-fields (s/with-gen (s/fspec :args (s/cat :request map?)
                                                      :ret map?)

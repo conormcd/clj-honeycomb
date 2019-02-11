@@ -34,15 +34,29 @@
   [& body]
   `(#'with-deterministic-tracing-ids-fn (fn [] ~@body)))
 
-(deftest get-request-header-works
+(deftest get-header-works
   (testing "Known values"
     (are [request header expected]
-         (= expected (#'middle/get-request-header request header))
+         (= expected (#'middle/get-header request header))
 
       {} "Host" nil
       {} "host" nil
-      sample-ring-request "Host" "localhost"
-      sample-ring-request "host" "localhost")))
+      sample-ring-request "Host" "targetserver.com"
+      sample-ring-request "host" "targetserver.com"))
+  (testing "Randomly generated data"
+    (check `middle/get-header)))
+
+(deftest get-headers-works
+  (testing "Known values"
+    (are [request headers expected]
+         (= expected (#'middle/get-headers request headers))
+
+      {} ["Content-Length" "Host"] nil
+      {} ["content-length" "host"] nil
+      sample-ring-request ["Content-Length" "Host"] {"content-length" "1234", "host" "targetserver.com"}
+      sample-ring-request ["content-length" "host"] {"content-length" "1234", "host" "targetserver.com"}))
+  (testing "Randomly generated data"
+    (check `middle/get-headers)))
 
 (deftest trace-data-works
   (testing "Valid data"
@@ -57,7 +71,9 @@
     (is (= {} (#'middle/trace-data {:headers {:x-honeycomb-trace "corrupt"}})))
     (with-redefs [propagation/unpack (fn [_header-string]
                                        (throw (Exception. "Barf")))]
-      (is (= {} (#'middle/trace-data {:headers {:x-honeycomb-trace "corrupt"}}))))))
+      (is (= {} (#'middle/trace-data {:headers {:x-honeycomb-trace "corrupt"}})))))
+  (testing "Randomly generated data"
+    (check `middle/trace-data)))
 
 (deftest default-extract-request-fields-works
   (testing "Known values"
@@ -65,8 +81,20 @@
       (are [input expected]
            (= expected (#'middle/default-extract-request-fields input))
 
-        {} {}
-        sample-ring-request sample-ring-request-extracted)))
+        {}
+        {}
+
+        sample-ring-request
+        sample-ring-request-extracted
+
+        (-> sample-ring-request
+            (dissoc :query-string)
+            (assoc :query-params {"bar" "bar"
+                                  "baz" "baz"}))
+        (-> sample-ring-request-extracted
+            (dissoc "ring.request.params")
+            (assoc "ring.request.params.bar" "bar"
+                   "ring.request.params.baz" "baz")))))
   (testing "Randomly generated data"
     (check `middle/default-extract-request-fields)))
 
@@ -108,9 +136,6 @@
                   (propagation/pack {:trace-id "TRACE"
                                      :version 1}))
         (assoc sample-ring-request-extracted
-               "ring.request.headers.X-Honeycomb-Trace" (propagation/pack
-                                                         {:trace-id "TRACE"
-                                                          :version 1})
                :name "GET /foo"
                :traceId "TRACE")
 
@@ -122,10 +147,6 @@
                                      :parent-span-id "PARENT"
                                      :version 1}))
         (assoc sample-ring-request-extracted
-               "ring.request.headers.X-Honeycomb-Trace" (propagation/pack
-                                                         {:trace-id "TRACE"
-                                                          :parent-span-id "PARENT"
-                                                          :version 1})
                :name "GET /foo"
                :parentId "PARENT"
                :traceId "TRACE")
@@ -139,10 +160,6 @@
                                      :version 1}))
         (assoc sample-ring-request-extracted
                "foo" "bar"
-               "ring.request.headers.X-Honeycomb-Trace" (propagation/pack
-                                                         {:trace-id "TRACE"
-                                                          :context {"foo" "bar"}
-                                                          :version 1})
                :name "GET /foo"
                :traceId "TRACE"))))
   (testing "Randomly generated data"
@@ -244,22 +261,14 @@
          (is (empty? errors))
          (is (= 1 (count events)))
          (when-let [^Event event (first events)]
-           (is (= {"ring.request.headers.host" "localhost"
-                   "ring.request.protocol" "HTTP/1.1"
-                   "ring.request.query-string" "bar=bar&baz=baz"
-                   "ring.request.remote-addr" "localhost"
-                   "ring.request.request-method" ":get"
-                   "ring.request.scheme" ":http"
-                   "ring.request.server-name" "localhost"
-                   "ring.request.server-port" 80
-                   "ring.request.uri" "/foo"
-                   "ring.response.headers.Content-Type" "text/plain"
-                   "ring.response.headers.some-other-header" ":ring-is-funny"
-                   "ring.response.status" 200
-                   "name" "GET /foo"
-                   "traceId" "deterministic-trace-id-1"
-                   "id" "deterministic-span-id-1"
-                   "parentId" nil}
+           (is (= (merge sample-ring-request-extracted
+                         sample-ring-response-extracted
+                         {"id" "deterministic-span-id-1"
+                          "name" "GET /foo"
+                          "parentId" nil
+                          "ring.request.request-method" ":get"
+                          "ring.request.scheme" ":http"
+                          "traceId" "deterministic-trace-id-1"})
                   (dissoc (into {} (.getFields event)) "durationMs")))))))
     (testing "Async handler (sad path)"
       (validate-events
@@ -276,20 +285,14 @@
          (is (empty? errors))
          (is (= 1 (count events)))
          (when-let [^Event event (first events)]
-           (is (= {"ring.request.headers.host" "localhost"
-                   "ring.request.protocol" "HTTP/1.1"
-                   "ring.request.query-string" "bar=bar&baz=baz"
-                   "ring.request.remote-addr" "localhost"
-                   "ring.request.request-method" ":get"
-                   "ring.request.scheme" ":http"
-                   "ring.request.server-name" "localhost"
-                   "ring.request.server-port" 80
-                   "ring.request.uri" "/foo"
-                   "exception" sample-exception
-                   "name" "GET /foo"
-                   "traceId" "deterministic-trace-id-1"
-                   "id" "deterministic-span-id-1"
-                   "parentId" nil}
+           (is (= (merge sample-ring-request-extracted
+                         {"exception" sample-exception
+                          "id" "deterministic-span-id-1"
+                          "name" "GET /foo"
+                          "parentId" nil
+                          "ring.request.request-method" ":get"
+                          "ring.request.scheme" ":http"
+                          "traceId" "deterministic-trace-id-1"})
                   (dissoc (into {} (.getFields event)) "durationMs")))))))
     (testing "Randomly generated input (happy path)"
       (doseq [options (gen/sample (s/gen :clj-honeycomb.middleware.ring/with-honeycomb-event-options))]
