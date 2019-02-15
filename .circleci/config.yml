@@ -82,7 +82,7 @@ jobs:
       - run:
           name: joker --lint
           command: |
-            curl -Lso joker.zip https://github.com/candid82/joker/releases/download/v0.11.1/joker-0.11.1-linux-amd64.zip
+            curl -Lso joker.zip https://github.com/candid82/joker/releases/download/v0.12.0/joker-0.12.0-linux-amd64.zip
             unzip joker.zip
             echo '{:known-macros [clojure.spec.alpha/fdef] :rules {:if-without-else true :unused-fn-parameters true}}' > ~/.joker
             find src test -type f -name '*.clj' -print0 | \
